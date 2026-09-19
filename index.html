@@ -368,11 +368,11 @@ function getData(key){
 }
 
 function setData(key,data){
- localStorage.setItem("olga_"+key,JSON.stringify(data));
-syncToSupabase(key,data);  
+  localStorage.setItem("olga_"+key,JSON.stringify(data));
+  syncToSupabase(key,data,schedule.find(r=>keyFor(r)===key));  
 }
 
-async function syncToSupabase(key,data){
+async function syncToSupabase(key,data,row){
   try {
     const parts = key.split("_");
     const lessonDate = parts[0];
@@ -389,14 +389,18 @@ async function syncToSupabase(key,data){
     .limit(1);
     if (findError) throw findError;
     const lessonData = {
-      lesson_date: lessonDate,
-      start_time: startTime,
-      lesson_name: lessonName,
-      status: data.status,
-      note: data.note || "",
-      substituted_by: data.sub || "",
-      modified_at: new Date().toISOString()
-      };
+  lesson_date: lessonDate,
+  start_time: startTime,
+  end_time: row[2],
+  gym_code: gymCode,
+  lesson_name: lessonName,
+  minutes: row[5],
+  price: row[6],
+  status: data.status,
+  note: data.note || "",
+  substituted_by: data.sub || "",
+  modified_at: new Date().toISOString()
+};
     if (existing && existing.length > 0) {
       const { error } = await supabaseClient
       .update(lessonData)
