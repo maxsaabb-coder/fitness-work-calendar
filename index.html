@@ -1,264 +1,551 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#111827">
-  <title>Calendario Olga</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Calendario Olga</title>
 
-  <style>
-    * { box-sizing: border-box; }
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;
+  background:#f3f4f6;
+  color:#111827
+}
+header{
+  background:#111827;
+  color:white;
+  padding:20px 16px 18px;
+}
+header h1{margin:0;font-size:25px}
+header p{margin:5px 0 0;color:#d1d5db;font-size:14px}
 
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f3f4f6;
-      color: #111827;
-    }
+main{
+  max-width:850px;
+  margin:auto;
+  padding:14px
+}
 
-    header {
-      background: #111827;
-      color: white;
-      padding: 22px 18px;
-    }
+.weeknav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:12px
+}
+.weeknav button,.today{
+  border:0;
+  background:white;
+  border-radius:10px;
+  padding:10px 12px;
+  box-shadow:0 1px 4px #0002;
+  cursor:pointer;
+  font-weight:600
+}
+#weekLabel{text-align:center;font-weight:700;font-size:14px}
 
-    header h1 {
-      margin: 0;
-      font-size: 25px;
-    }
+.summary{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+  margin:12px 0
+}
+.card{
+  background:white;
+  padding:13px;
+  border-radius:13px;
+  box-shadow:0 1px 5px #0002
+}
+.card small{color:#6b7280}
+.card strong{
+  display:block;
+  font-size:22px;
+  margin-top:4px
+}
 
-    header p {
-      margin: 6px 0 0;
-      color: #d1d5db;
-    }
+.days{
+  display:flex;
+  overflow-x:auto;
+  gap:7px;
+  margin:15px 0 12px
+}
+.daybtn{
+  min-width:82px;
+  border:0;
+  background:white;
+  padding:10px 7px;
+  border-radius:10px;
+  font-weight:600;
+  cursor:pointer
+}
+.daybtn.active{background:#111827;color:white}
 
-    main {
-      max-width: 650px;
-      margin: auto;
-      padding: 18px;
-    }
+.daytitle{
+  font-size:20px;
+  margin:12px 2px
+}
 
-    .card {
-      background: white;
-      border-radius: 18px;
-      padding: 18px;
-      margin-bottom: 15px;
-      box-shadow: 0 3px 12px rgba(0,0,0,.06);
-    }
+.lesson{
+  background:white;
+  border-radius:14px;
+  padding:14px;
+  margin-bottom:10px;
+  box-shadow:0 1px 5px #0002;
+  border-left:5px solid #9ca3af
+}
+.lesson.done{border-left-color:#16a34a}
+.lesson.cancel{border-left-color:#dc2626}
+.lesson.sub{border-left-color:#2563eb}
+.lesson.closed{border-left-color:#7c3aed}
+.lesson.absent{border-left-color:#f59e0b}
 
-    .card h2 {
-      margin-top: 0;
-    }
+.top{
+  display:flex;
+  justify-content:space-between;
+  gap:10px
+}
+.time{font-weight:800;font-size:17px}
+.price{font-weight:800}
+.name{font-size:17px;font-weight:700;margin-top:5px}
+.gym{font-size:13px;color:#6b7280;margin-top:3px}
 
-    .lesson {
-      border-top: 1px solid #e5e7eb;
-      padding: 14px 0;
-    }
+.status{
+  margin-top:11px;
+  font-size:13px;
+  font-weight:700
+}
 
-    .lesson:first-of-type {
-      border-top: 0;
-    }
+.actions{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:6px;
+  margin-top:10px
+}
+.actions button{
+  border:1px solid #d1d5db;
+  background:#f9fafb;
+  border-radius:9px;
+  padding:9px 5px;
+  cursor:pointer;
+  font-size:12px
+}
+.actions button:first-child{
+  background:#ecfdf5;
+  border-color:#86efac
+}
 
-    .time {
-      font-weight: 700;
-      font-size: 18px;
-    }
+.allDone{
+  width:100%;
+  border:0;
+  border-radius:12px;
+  padding:12px;
+  background:#166534;
+  color:white;
+  font-weight:700;
+  margin:3px 0 15px;
+  cursor:pointer
+}
 
-    .gym {
-      display: inline-block;
-      background: #e5e7eb;
-      border-radius: 8px;
-      padding: 3px 8px;
-      margin: 5px 0;
-      font-size: 13px;
-      font-weight: 600;
-    }
+.gymTotals{
+  margin-top:20px
+}
+.gymrow{
+  display:flex;
+  justify-content:space-between;
+  background:white;
+  padding:11px;
+  border-radius:9px;
+  margin:6px 0;
+  font-size:14px
+}
 
-    .class-name {
-      font-size: 17px;
-      font-weight: 600;
-    }
+footer{
+  text-align:center;
+  color:#6b7280;
+  font-size:12px;
+  padding:25px
+}
 
-    .price {
-      color: #059669;
-      font-weight: 700;
-      margin-top: 4px;
-    }
+.modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:#0008;
+  align-items:flex-end;
+  justify-content:center;
+  z-index:20
+}
+.modal.show{display:flex}
+.panel{
+  width:100%;
+  max-width:600px;
+  background:white;
+  border-radius:18px 18px 0 0;
+  padding:20px;
+  max-height:90vh;
+  overflow:auto
+}
+.panel h3{margin-top:0}
+.panel button{
+  width:100%;
+  margin:4px 0;
+  padding:12px;
+  border:0;
+  border-radius:9px;
+  font-weight:600;
+  cursor:pointer
+}
+.panel input,.panel textarea{
+  width:100%;
+  padding:11px;
+  margin:6px 0 12px;
+  border:1px solid #ccc;
+  border-radius:9px;
+  font-size:16px
+}
+.close{background:#e5e7eb}
+.s1{background:#dcfce7}
+.s2{background:#fee2e2}
+.s3{background:#fef3c7}
+.s4{background:#dbeafe}
+.s5{background:#ede9fe}
+.s0{background:#f3f4f6}
 
-    .status {
-      margin-top: 9px;
-      color: #6b7280;
-      font-size: 14px;
-    }
-
-    .summary {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-
-    .summary div {
-      background: #f9fafb;
-      padding: 14px;
-      border-radius: 13px;
-      text-align: center;
-    }
-
-    .number {
-      display: block;
-      font-size: 22px;
-      font-weight: 700;
-    }
-
-    footer {
-      text-align: center;
-      padding: 20px;
-      color: #9ca3af;
-      font-size: 13px;
-    }
-  </style>
+@media(min-width:650px){
+ .summary{grid-template-columns:repeat(4,1fr)}
+ .actions{grid-template-columns:repeat(3,1fr)}
+}
+</style>
 </head>
 
 <body>
 
 <header>
-  <h1>Calendario Olga</h1>
-  <p>Lezioni e attività lavorative</p>
+<h1>Calendario Olga</h1>
+<p>Lezioni · presenze · compensi</p>
 </header>
 
 <main>
 
-  <div class="card">
-    <h2>Oggi</h2>
-    <p id="today"></p>
-  </div>
+<div class="weeknav">
+<button onclick="changeWeek(-7)">‹</button>
+<div id="weekLabel"></div>
+<button onclick="changeWeek(7)">›</button>
+</div>
 
-  <div class="card">
-    <h2>Lezioni di oggi</h2>
-    <div id="lessons"></div>
-  </div>
+<button class="today" onclick="goToday()">Torna a oggi</button>
 
-  <div class="card">
-    <h2>Riepilogo settimana</h2>
+<div class="summary">
+<div class="card"><small>Svolte</small><strong id="doneCount">0</strong></div>
+<div class="card"><small>Ore effettive</small><strong id="hours">0h</strong></div>
+<div class="card"><small>Fatturabile</small><strong id="money">€0</strong></div>
+<div class="card"><small>Non svolte</small><strong id="notDone">0</strong></div>
+</div>
 
-    <div class="summary">
-      <div>
-        <span class="number">33</span>
-        lezioni
-      </div>
+<div class="days" id="days"></div>
 
-      <div>
-        <span class="number">27h 45m</span>
-        ore
-      </div>
+<h2 class="daytitle" id="dayTitle"></h2>
 
-      <div>
-        <span class="number">€717</span>
-        previste
-      </div>
+<button class="allDone" onclick="allDone()">✓ Segna tutte svolte</button>
 
-      <div>
-        <span class="number">4</span>
-        palestre
-      </div>
-    </div>
-  </div>
+<div id="lessons"></div>
+
+<div class="gymTotals">
+<h3>Riepilogo settimana</h3>
+<div id="gymTotals"></div>
+</div>
 
 </main>
 
-<footer>
-  Fitness Work Calendar
-</footer>
+<footer>Fitness Work Calendar · Olga</footer>
+
+<div class="modal" id="modal">
+<div class="panel">
+<h3 id="modalTitle">Aggiorna lezione</h3>
+
+<button class="s1" onclick="saveStatus('Svolta')">✓ Svolta</button>
+<button class="s2" onclick="saveStatus('Annullata palestra')">✕ Annullata palestra</button>
+<button class="s3" onclick="saveStatus('Assenza Olga')">👤 Assenza Olga</button>
+<button class="s4" onclick="showSub()">↔ Sostituita</button>
+<button class="s5" onclick="saveStatus('Chiusura / Festività')">◷ Chiusura / Festività</button>
+<button class="s0" onclick="saveStatus('Da confermare')">Da confermare</button>
+
+<div id="subBox" style="display:none">
+<label>Sostituita da</label>
+<input id="subName" placeholder="Nome sostituto/a">
+<button class="s4" onclick="saveSub()">Salva sostituzione</button>
+</div>
+
+<label>Nota</label>
+<textarea id="note" placeholder="Nota facoltativa"></textarea>
+
+<button class="close" onclick="closeModal()">Chiudi</button>
+</div>
+</div>
 
 <script>
+const schedule=[
+[1,"08:15","09:00","TN","ACQUA BIKE",45,25],
+[1,"09:00","09:45","TN","GAG",45,25],
+[1,"13:00","13:55","A&R","CIRCUITO",55,20],
+[1,"15:00","15:55","A&R","PILATES",55,20],
+[1,"16:00","16:55","A&R","GAG",55,20],
+[1,"18:15","19:00","TN","CIRCUITO",45,25],
+[1,"19:00","19:45","TN","ACQUA POWER",45,25],
+[1,"19:45","20:30","TN","GAG",45,25],
 
-const schedule = {
+[2,"08:10","09:05","A&R","GINNASTICA DOLCE",55,20],
+[2,"09:10","10:05","A&R","PILATES",55,20],
+[2,"10:30","11:25","MAX","TOTAL BODY",55,17],
+[2,"11:30","12:25","MAX","YOGA FLEX",55,17],
+[2,"13:30","14:15","TN","ACQUA BOX",45,25],
+[2,"14:15","15:00","TN","CIRCUITO",45,25],
 
-1: [
-["08:15","09:00","TN","ACQUA BIKE",25],
-["09:00","09:45","TN","GAG",25],
-["13:00","13:55","A&R","CIRCUITO",20],
-["15:00","15:55","A&R","PILATES",20],
-["16:00","16:55","A&R","GAG",20],
-["18:15","19:00","TN","CIRCUITO",25],
-["19:00","19:45","TN","ACQUA POWER",25],
-["19:45","20:30","TN","GAG",25]
-],
+[3,"09:00","09:55","A&R","AEROBIC ENERGY",55,20],
+[3,"10:45","11:40","STSM","PILATES",55,17],
+[3,"18:15","19:00","TN","ACQUA BIKE",45,25],
+[3,"19:00","19:45","TN","ACQUA BOX",45,25],
+[3,"19:45","20:30","TN","ACQUA GYM",45,25],
 
-2: [
-["08:10","09:05","A&R","GINNASTICA DOLCE",20],
-["09:10","10:05","A&R","PILATES",20],
-["10:30","11:25","MAX","TOTAL BODY",17],
-["11:30","12:25","MAX","YOGA FLEX",17],
-["13:30","14:15","TN","ACQUA BOX",25],
-["14:15","15:00","TN","CIRCUITO",25]
-],
+[4,"08:10","09:05","A&R","GINNASTICA DOLCE",55,20],
+[4,"09:10","10:05","A&R","PILATES",55,20],
+[4,"10:30","11:25","MAX","MAKE BODY",55,17],
+[4,"13:30","14:15","TN","ACQUA BOX",45,25],
+[4,"14:15","15:00","TN","ACQUA BIKE",45,25],
+[4,"18:15","19:00","TN","CIRCUITO",45,25],
+[4,"19:00","19:45","TN","ACQUA POWER",45,25],
+[4,"19:45","20:30","TN","GAG",45,25],
 
-3: [
-["09:00","09:55","A&R","AEROBIC ENERGY",20],
-["10:45","11:40","STSM","PILATES",17],
-["18:15","19:00","TN","ACQUA BIKE",25],
-["19:00","19:45","TN","ACQUA BOX",25],
-["19:45","20:30","TN","ACQUA GYM",25]
-],
+[5,"09:00","09:55","A&R","AEROBIC ENERGY",55,20],
+[5,"10:30","11:25","MAX","GAG",55,17],
+[5,"11:30","12:25","MAX","YOGA FLEX",55,17],
+[5,"13:00","13:55","A&R","STEP",55,20],
+[5,"15:00","15:55","A&R","PILATES",55,20],
+[5,"16:00","16:55","A&R","GAG",55,20]
+];
 
-4: [
-["08:10","09:05","A&R","GINNASTICA DOLCE",20],
-["09:10","10:05","A&R","PILATES",20],
-["10:30","11:25","MAX","MAKE BODY",17],
-["13:30","14:15","TN","ACQUA BOX",25],
-["14:15","15:00","TN","ACQUA BIKE",25],
-["18:15","19:00","TN","CIRCUITO",25],
-["19:00","19:45","TN","ACQUA POWER",25],
-["19:45","20:30","TN","GAG",25]
-],
+const dayNames=["","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì"];
+let selectedDay=1;
+let currentWeek=getMonday(new Date());
+let selected=null;
 
-5: [
-["09:00","09:55","A&R","AEROBIC ENERGY",20],
-["10:30","11:25","MAX","GAG",17],
-["11:30","12:25","MAX","YOGA FLEX",17],
-["13:00","13:55","A&R","STEP",20],
-["15:00","15:55","A&R","PILATES",20],
-["16:00","16:55","A&R","GAG",20]
-]
-
-};
-
-const now = new Date();
-
-document.getElementById("today").textContent =
-  now.toLocaleDateString("it-IT", {
-    weekday:"long",
-    day:"numeric",
-    month:"long",
-    year:"numeric"
-  });
-
-const day = now.getDay();
-const container = document.getElementById("lessons");
-const lessons = schedule[day] || [];
-
-if (lessons.length === 0) {
-  container.innerHTML =
-    "<p>Nessuna lezione programmata oggi 🎉</p>";
-} else {
-
-  lessons.forEach(l => {
-
-    container.innerHTML += `
-      <div class="lesson">
-        <div class="time">${l[0]} – ${l[1]}</div>
-        <div class="gym">${l[2]}</div>
-        <div class="class-name">${l[3]}</div>
-        <div class="price">€${l[4]}</div>
-        <div class="status">Da confermare</div>
-      </div>
-    `;
-
-  });
-
+function getMonday(d){
+ let x=new Date(d);
+ let day=x.getDay();
+ let diff=x.getDate()-day+(day===0?-6:1);
+ x.setDate(diff);
+ x.setHours(12,0,0,0);
+ return x;
 }
 
+function iso(d){
+ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+
+function dateForDay(day){
+ let d=new Date(currentWeek);
+ d.setDate(d.getDate()+day-1);
+ return d;
+}
+
+function keyFor(row){
+ return iso(dateForDay(row[0]))+"_"+row[1]+"_"+row[3]+"_"+row[4];
+}
+
+function getData(key){
+ try{return JSON.parse(localStorage.getItem("olga_"+key))||{status:"Da confermare",note:"",sub:""}}
+ catch{return {status:"Da confermare",note:"",sub:""}}
+}
+
+function setData(key,data){
+ localStorage.setItem("olga_"+key,JSON.stringify(data));
+}
+
+function fmtDate(d){
+ return d.toLocaleDateString("it-IT",{day:"numeric",month:"short"});
+}
+
+function renderDays(){
+ let html="";
+ for(let i=1;i<=5;i++){
+   let d=dateForDay(i);
+   html+=`<button class="daybtn ${i===selectedDay?"active":""}"
+   onclick="selectedDay=${i};render()">${dayNames[i]}<br><small>${fmtDate(d)}</small></button>`;
+ }
+ document.getElementById("days").innerHTML=html;
+}
+
+function cssStatus(s){
+ if(s==="Svolta")return"done";
+ if(s==="Annullata palestra")return"cancel";
+ if(s==="Assenza Olga")return"absent";
+ if(s==="Sostituita")return"sub";
+ if(s==="Chiusura / Festività")return"closed";
+ return"";
+}
+
+function renderLessons(){
+ const rows=schedule.filter(x=>x[0]===selectedDay);
+ let html="";
+ rows.forEach((r,i)=>{
+   let data=getData(keyFor(r));
+   let extra=data.sub?` · ${data.sub}`:"";
+   html+=`
+   <div class="lesson ${cssStatus(data.status)}">
+    <div class="top">
+      <div class="time">${r[1]}–${r[2]}</div>
+      <div class="price">€${r[6]}</div>
+    </div>
+    <div class="name">${r[4]}</div>
+    <div class="gym">${r[3]} · ${r[5]} min</div>
+    <div class="status">${data.status}${extra}</div>
+    ${data.note?`<div class="gym">Nota: ${data.note}</div>`:""}
+    <div class="actions">
+      <button onclick="quickDone(${i})">✓ Svolta</button>
+      <button onclick="openModal(${i})">Modifica</button>
+    </div>
+   </div>`;
+ });
+ document.getElementById("lessons").innerHTML=html;
+ document.getElementById("dayTitle").textContent=
+ dayNames[selectedDay]+" "+fmtDate(dateForDay(selectedDay));
+}
+
+function weekRows(){
+ return schedule.map(r=>({r,data:getData(keyFor(r))}));
+}
+
+function renderSummary(){
+ let done=0,min=0,money=0,notDone=0;
+ let gyms={};
+
+ weekRows().forEach(x=>{
+   let r=x.r,d=x.data;
+   if(!gyms[r[3]])gyms[r[3]]={n:0,min:0,euro:0};
+
+   if(d.status==="Svolta"){
+     done++;
+     min+=r[5];
+     money+=r[6];
+     gyms[r[3]].n++;
+     gyms[r[3]].min+=r[5];
+     gyms[r[3]].euro+=r[6];
+   } else if(d.status!=="Da confermare"){
+     notDone++;
+   }
+ });
+
+ document.getElementById("doneCount").textContent=done;
+ document.getElementById("hours").textContent=
+ Math.floor(min/60)+"h "+(min%60)+"m";
+ document.getElementById("money").textContent="€"+money;
+ document.getElementById("notDone").textContent=notDone;
+
+ let html="";
+ ["A&R","MAX","TN","STSM"].forEach(g=>{
+   let v=gyms[g]||{n:0,min:0,euro:0};
+   html+=`<div class="gymrow">
+   <b>${g}</b>
+   <span>${v.n} lez. · ${Math.floor(v.min/60)}h ${v.min%60}m · <b>€${v.euro}</b></span>
+   </div>`;
+ });
+ document.getElementById("gymTotals").innerHTML=html;
+}
+
+function renderWeekLabel(){
+ let end=new Date(currentWeek);
+ end.setDate(end.getDate()+6);
+ document.getElementById("weekLabel").textContent=
+ "Settimana "+fmtDate(currentWeek)+" – "+fmtDate(end);
+}
+
+function render(){
+ renderWeekLabel();
+ renderDays();
+ renderLessons();
+ renderSummary();
+}
+
+function quickDone(index){
+ let rows=schedule.filter(x=>x[0]===selectedDay);
+ let r=rows[index];
+ let d=getData(keyFor(r));
+ d.status="Svolta";
+ d.sub="";
+ setData(keyFor(r),d);
+ render();
+}
+
+function allDone(){
+ schedule.filter(x=>x[0]===selectedDay).forEach(r=>{
+   let d=getData(keyFor(r));
+   d.status="Svolta";
+   d.sub="";
+   setData(keyFor(r),d);
+ });
+ render();
+}
+
+function openModal(index){
+ let rows=schedule.filter(x=>x[0]===selectedDay);
+ selected=rows[index];
+ let d=getData(keyFor(selected));
+ document.getElementById("modalTitle").textContent=
+ selected[1]+" · "+selected[4]+" · "+selected[3];
+ document.getElementById("note").value=d.note||"";
+ document.getElementById("subName").value=d.sub||"";
+ document.getElementById("subBox").style.display="none";
+ document.getElementById("modal").classList.add("show");
+}
+
+function saveStatus(status){
+ if(!selected)return;
+ let d=getData(keyFor(selected));
+ d.status=status;
+ d.note=document.getElementById("note").value;
+ if(status!=="Sostituita")d.sub="";
+ setData(keyFor(selected),d);
+ closeModal();
+ render();
+}
+
+function showSub(){
+ document.getElementById("subBox").style.display="block";
+ document.getElementById("subName").focus();
+}
+
+function saveSub(){
+ let name=document.getElementById("subName").value.trim();
+ if(!name){alert("Inserisci il nome di chi ha sostituito Olga.");return}
+ let d=getData(keyFor(selected));
+ d.status="Sostituita";
+ d.sub=name;
+ d.note=document.getElementById("note").value;
+ setData(keyFor(selected),d);
+ closeModal();
+ render();
+}
+
+function closeModal(){
+ document.getElementById("modal").classList.remove("show");
+ selected=null;
+}
+
+function changeWeek(days){
+ currentWeek.setDate(currentWeek.getDate()+days);
+ render();
+}
+
+function goToday(){
+ currentWeek=getMonday(new Date());
+ let d=new Date().getDay();
+ selectedDay=(d>=1&&d<=5)?d:1;
+ render();
+}
+
+goToday();
 </script>
 
 </body>
