@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#111827">
+  <title>Calendario Olga</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f3f4f6;
+      color: #111827;
+    }
+
+    header {
+      background: #111827;
+      color: white;
+      padding: 22px 18px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 25px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      color: #d1d5db;
+    }
+
+    main {
+      max-width: 650px;
+      margin: auto;
+      padding: 18px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 15px;
+      box-shadow: 0 3px 12px rgba(0,0,0,.06);
+    }
+
+    .card h2 {
+      margin-top: 0;
+    }
+
+    .lesson {
+      border-top: 1px solid #e5e7eb;
+      padding: 14px 0;
+    }
+
+    .lesson:first-of-type {
+      border-top: 0;
+    }
+
+    .time {
+      font-weight: 700;
+      font-size: 18px;
+    }
+
+    .gym {
+      display: inline-block;
+      background: #e5e7eb;
+      border-radius: 8px;
+      padding: 3px 8px;
+      margin: 5px 0;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .class-name {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .price {
+      color: #059669;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .status {
+      margin-top: 9px;
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .summary div {
+      background: #f9fafb;
+      padding: 14px;
+      border-radius: 13px;
+      text-align: center;
+    }
+
+    .number {
+      display: block;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #9ca3af;
+      font-size: 13px;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Calendario Olga</h1>
+  <p>Lezioni e attività lavorative</p>
+</header>
+
+<main>
+
+  <div class="card">
+    <h2>Oggi</h2>
+    <p id="today"></p>
+  </div>
+
+  <div class="card">
+    <h2>Lezioni di oggi</h2>
+    <div id="lessons"></div>
+  </div>
+
+  <div class="card">
+    <h2>Riepilogo settimana</h2>
+
+    <div class="summary">
+      <div>
+        <span class="number">33</span>
+        lezioni
+      </div>
+
+      <div>
+        <span class="number">27h 45m</span>
+        ore
+      </div>
+
+      <div>
+        <span class="number">€717</span>
+        previste
+      </div>
+
+      <div>
+        <span class="number">4</span>
+        palestre
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  Fitness Work Calendar
+</footer>
+
+<script>
+
+const schedule = {
+
+1: [
+["08:15","09:00","TN","ACQUA BIKE",25],
+["09:00","09:45","TN","GAG",25],
+["13:00","13:55","A&R","CIRCUITO",20],
+["15:00","15:55","A&R","PILATES",20],
+["16:00","16:55","A&R","GAG",20],
+["18:15","19:00","TN","CIRCUITO",25],
+["19:00","19:45","TN","ACQUA POWER",25],
+["19:45","20:30","TN","GAG",25]
+],
+
+2: [
+["08:10","09:05","A&R","GINNASTICA DOLCE",20],
+["09:10","10:05","A&R","PILATES",20],
+["10:30","11:25","MAX","TOTAL BODY",17],
+["11:30","12:25","MAX","YOGA FLEX",17],
+["13:30","14:15","TN","ACQUA BOX",25],
+["14:15","15:00","TN","CIRCUITO",25]
+],
+
+3: [
+["09:00","09:55","A&R","AEROBIC ENERGY",20],
+["10:45","11:40","STSM","PILATES",17],
+["18:15","19:00","TN","ACQUA BIKE",25],
+["19:00","19:45","TN","ACQUA BOX",25],
+["19:45","20:30","TN","ACQUA GYM",25]
+],
+
+4: [
+["08:10","09:05","A&R","GINNASTICA DOLCE",20],
+["09:10","10:05","A&R","PILATES",20],
+["10:30","11:25","MAX","MAKE BODY",17],
+["13:30","14:15","TN","ACQUA BOX",25],
+["14:15","15:00","TN","ACQUA BIKE",25],
+["18:15","19:00","TN","CIRCUITO",25],
+["19:00","19:45","TN","ACQUA POWER",25],
+["19:45","20:30","TN","GAG",25]
+],
+
+5: [
+["09:00","09:55","A&R","AEROBIC ENERGY",20],
+["10:30","11:25","MAX","GAG",17],
+["11:30","12:25","MAX","YOGA FLEX",17],
+["13:00","13:55","A&R","STEP",20],
+["15:00","15:55","A&R","PILATES",20],
+["16:00","16:55","A&R","GAG",20]
+]
+
+};
+
+const now = new Date();
+
+document.getElementById("today").textContent =
+  now.toLocaleDateString("it-IT", {
+    weekday:"long",
+    day:"numeric",
+    month:"long",
+    year:"numeric"
+  });
+
+const day = now.getDay();
+const container = document.getElementById("lessons");
+const lessons = schedule[day] || [];
+
+if (lessons.length === 0) {
+  container.innerHTML =
+    "<p>Nessuna lezione programmata oggi 🎉</p>";
+} else {
+
+  lessons.forEach(l => {
+
+    container.innerHTML += `
+      <div class="lesson">
+        <div class="time">${l[0]} – ${l[1]}</div>
+        <div class="gym">${l[2]}</div>
+        <div class="class-name">${l[3]}</div>
+        <div class="price">€${l[4]}</div>
+        <div class="status">Da confermare</div>
+      </div>
+    `;
+
+  });
+
+}
+
+</script>
+
+</body>
+</html>
