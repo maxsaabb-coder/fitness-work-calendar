@@ -396,7 +396,7 @@ async function syncToSupabase(key,data,row){
   lesson_name: lessonName,
   minutes: row[5],
   price: row[6],
-  status: data.status,
+  status: statusToDb(data.status),
   note: data.note || "",
   substituted_by: data.sub || "",
   modified_at: new Date().toISOString()
@@ -470,7 +470,15 @@ supabaseClient.auth.onAuthStateChange((event, session) => {
 
 checkSession();
 
-function cssStatus(s){
+function statusToDb(s){
+  if(s==="Svolta") return "done";
+  if(s==="Annullata palestra") return "gym_cancelled";
+  if(s==="Assenza Olga") return "olga_absent";
+  if(s==="Sostituita") return "substituted";
+  if(s==="Chiusura / Festività") return "holiday_closed";
+  return "pending";
+}
+  function cssStatus(s){
  if(s==="Svolta")return"done";
  if(s==="Annullata palestra")return"cancel";
  if(s==="Assenza Olga")return"absent";
