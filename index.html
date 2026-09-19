@@ -218,6 +218,7 @@ footer{
  .actions{grid-template-columns:repeat(3,1fr)}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
 <body>
@@ -361,7 +362,48 @@ function getData(key){
 
 function setData(key,data){
  localStorage.setItem("olga_"+key,JSON.stringify(data));
+syncToSupabase(key,data);  
 }
+
+async function syncToSupabase(key,data){
+  try {
+    const parts = key.split("_");
+    const lessonDate = parts[0];
+    const startTime = parts[1];
+    const gymCode = parts[2];
+    const lessonName = parts.slice(3).join("_");
+    const { data: existing, error: findError } = await supabaseClient
+    .from("lessons")
+    .select("id")
+    .eq("lesson_date", lessonDate)
+    .eq("start_time", startTime)
+    .eq("gym_code", gymCode)
+    .eq("lesson_name", lessonName)
+    .limit(1);
+    if (findError) throw findError;
+    const lessonData = {
+      lesson_date: lessonDate,
+      start_time: startTime,
+      lesson_name: lessonName,
+      status: data.status,
+      note: data.note || "",
+      substituted_by: data.sub || "",
+      modified_at: new Date().toISOString()
+      };
+    if (existing && existing.length > 0) {
+      const { error } = await supabaseClient
+      .update(lessonData)
+      .eq("id", existing[0].id);
+      if (error) throw error;
+      } else {
+      const { error } = await supabaseClient
+      .insert([lessonData]);
+      if (error) throw error;
+      }
+    } catch (err) {
+    console.error("Errore Supabase:", err);
+    }
+  }
 
 function fmtDate(d){
  return d.toLocaleDateString("it-IT",{day:"numeric",month:"short"});
@@ -376,6 +418,9 @@ function renderDays(){
  }
  document.getElementById("days").innerHTML=html;
 }
+  const SUPABASE_URL = "https://jdsiyrsusnnwporidais.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_ELXt9cC6F9NiYpwPL_AhHg_DEbHm0im";
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function cssStatus(s){
  if(s==="Svolta")return"done";
