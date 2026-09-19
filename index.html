@@ -397,7 +397,8 @@ async function syncToSupabase(key,data){
       if (error) throw error;
       } else {
       const { error } = await supabaseClient
-      .insert([lessonData]);
+        .from("lessons")
+        .insert([lessonData]);
       if (error) throw error;
       }
     } catch (err) {
