@@ -222,6 +222,13 @@ footer{
 </head>
 
 <body>
+  <div id="loginBox" style="max-width:420px;margin:40px auto;padding:20px;background:white;border-radius:16px;box-shadow:0 4px 20px #0002;">
+  <h2>Accesso Calendario Olga</h2>
+  <input id="loginEmail" type="email" placeholder="Email" style="width:100%;padding:12px;margin:8px 0;box-sizing:border-box;">
+  <input id="loginPassword" type="password" placeholder="Password" style="width:100%;padding:12px;margin:8px 0;box-sizing:border-box;">
+  <button onclick="login()" style="width:100%;padding:12px;margin-top:8px;">Accedi</button>
+  <p id="loginError" style="color:#c00;"></p>
+</div>
 
 <header>
 <h1>Calendario Olga</h1>
@@ -422,6 +429,42 @@ function renderDays(){
   const SUPABASE_URL = "https://jdsiyrsusnnwporidais.supabase.co";
   const SUPABASE_KEY = "sb_publishable_ELXt9cC6F9NiYpwPL_AhHg_DEbHm0im";
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  async function login() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+  const errorBox = document.getElementById("loginError");
+
+  errorBox.textContent = "";
+
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email: email,
+    password: password
+  });
+
+  if (error) {
+    errorBox.textContent = "Email o password non corretti.";
+    return;
+  }
+
+  document.getElementById("loginBox").style.display = "none";
+}
+
+  async function checkSession() {
+  const { data } = await supabaseClient.auth.getSession();
+
+  if (data.session) {
+    document.getElementById("loginBox").style.display = "none";
+  } else {
+    document.getElementById("loginBox").style.display = "block";
+  }
+}
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  document.getElementById("loginBox").style.display = session ? "none" : "block";
+});
+
+checkSession();
 
 function cssStatus(s){
  if(s==="Svolta")return"done";
