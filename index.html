@@ -403,7 +403,8 @@ async function syncToSupabase(key,data,row){
 };
     if (existing && existing.length > 0) {
       const { error } = await supabaseClient
-      .update(lessonData)
+      .from("lessons")
+        .update(lessonData)
       .eq("id", existing[0].id);
       if (error) throw error;
       } else {
