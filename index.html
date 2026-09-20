@@ -257,7 +257,7 @@ footer{
 
 <h2 class="daytitle" id="dayTitle"></h2>
 
-<button class="allDone" onclick="allDone()">✓ Segna tutte svolte</button>
+<button id="allDoneBtn" class="allDone" onclick="allDone()">✓ Segna tutte svolte</button>
 
 <div id="lessons"></div>
 
@@ -577,6 +577,7 @@ function render(){
  renderDays();
  renderLessons();
  renderSummary();
+ document.getElementById("allDoneBtn").style.display = isReadOnly ? "none" : "";
 }
 
 function quickDone(index){
