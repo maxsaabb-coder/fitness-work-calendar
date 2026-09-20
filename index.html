@@ -453,6 +453,7 @@ function renderDays(){
   }
 
   document.getElementById("loginBox").style.display = "none";
+  loadWeekFromSupabase().then(render);
 }
 
   async function checkSession() {
@@ -635,16 +636,53 @@ function closeModal(){
  selected=null;
 }
 
-function changeWeek(days){
+function statusFromDb(s){
+  if(s==="done") return "Svolta";
+  if(s==="gym_cancelled") return "Annullata palestra";
+  if(s==="olga_absent") return "Assenza Olga";
+  if(s==="substituted") return "Sostituita";
+  if(s==="holiday_closed") return "Chiusura / Festività";
+  return "Da confermare";
+}
+
+async function loadWeekFromSupabase(){
+  try {
+    const start = iso(currentWeek);
+    const endDate = new Date(currentWeek);
+    endDate.setDate(endDate.getDate()+6);
+    const end = iso(endDate);
+
+    const { data, error } = await supabaseClient
+      .from("lessons")
+      .select("lesson_date,start_time,gym_code,lesson_name,status,note,substituted_by")
+      .gte("lesson_date", start)
+      .lte("lesson_date", end);
+
+    if(error) throw error;
+
+    (data || []).forEach(item => {
+      const key = item.lesson_date+"_"+String(item.start_time).slice(0,5)+"_"+item.gym_code+"_"+item.lesson_name;
+
+      localStorage.setItem("olga_"+key, JSON.stringify({
+        status: statusFromDb(item.status),
+        note: item.note || "",
+        sub: item.substituted_by || ""
+      }));
+    });
+  } catch(err) {
+    console.error("Errore lettura Supabase:", err);
+  }
+}
+  function changeWeek(days){
  currentWeek.setDate(currentWeek.getDate()+days);
- render();
+ loadWeekFromSupabase().then(render);
 }
 
 function goToday(){
  currentWeek=getMonday(new Date());
  let d=new Date().getDay();
  selectedDay=(d>=1&&d<=5)?d:1;
- render();
+ loadWeekFromSupabase().then(render);
 }
 
 goToday();
