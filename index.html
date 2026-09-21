@@ -264,6 +264,10 @@ footer{
 <div class="gymTotals">
 <h3>Riepilogo settimana</h3>
 <div id="gymTotals"></div>
+  <div class="gymTotals" style="margin-top:24px">
+  <h3 id="monthTitle">Riepilogo mensile</h3>
+  <div id="monthTotals"></div>
+</div>
 </div>
 
 </main>
@@ -565,7 +569,76 @@ function renderSummary(){
  document.getElementById("gymTotals").innerHTML=html;
 }
 
-function renderWeekLabel(){
+async function renderMonthlySummary(){
+  try{
+    const monthDate = new Date(currentWeek);
+    const y = monthDate.getFullYear();
+    const m = monthDate.getMonth();
+
+    const first = new Date(y, m, 1);
+    const last = new Date(y, m + 1, 0);
+
+    const start = iso(first);
+    const end = iso(last);
+
+    const { data, error } = await supabaseClient
+      .from("lessons")
+      .select("lesson_date,gym_code,minutes,price,status")
+      .gte("lesson_date", start)
+      .lte("lesson_date", end)
+      .eq("status", "done");
+
+    if(error) throw error;
+
+    const gyms = {
+      "AR": {n:0,min:0,euro:0},
+      "MAX": {n:0,min:0,euro:0},
+      "TN": {n:0,min:0,euro:0},
+      "STSM": {n:0,min:0,euro:0}
+    };
+
+    (data || []).forEach(r=>{
+      if(!gyms[r.gym_code]) gyms[r.gym_code]={n:0,min:0,euro:0};
+      gyms[r.gym_code].n++;
+      gyms[r.gym_code].min += Number(r.minutes || 0);
+      gyms[r.gym_code].euro += Number(r.price || 0);
+    });
+
+    const names = {
+      "AR":"A&R",
+      "MAX":"MAX",
+      "TN":"TN",
+      "STSM":"STSM"
+    };
+
+    let html="";
+
+    ["AR","MAX","TN","STSM"].forEach(g=>{
+      const v=gyms[g];
+      html+=`
+        <div class="gymrow">
+          <b>${names[g]}</b>
+          <span>${v.n} lez. · ${Math.floor(v.min/60)}h ${v.min%60}m · <b>€${v.euro}</b></span>
+        </div>`;
+    });
+
+    const monthName = monthDate.toLocaleDateString("it-IT",{
+      month:"long",
+      year:"numeric"
+    });
+
+    document.getElementById("monthTitle").textContent =
+      "Riepilogo " + monthName;
+
+    document.getElementById("monthTotals").innerHTML = html;
+
+  }catch(err){
+    console.error("Errore riepilogo mensile:",err);
+    document.getElementById("monthTotals").innerHTML =
+      "<div>Impossibile caricare il riepilogo mensile.</div>";
+  }
+}
+  function renderWeekLabel(){
  let end=new Date(currentWeek);
  end.setDate(end.getDate()+6);
  document.getElementById("weekLabel").textContent=
@@ -577,6 +650,7 @@ function render(){
  renderDays();
  renderLessons();
  renderSummary();
+  renderMonthlySummary();
  document.getElementById("allDoneBtn").style.display = isReadOnly ? "none" : "";
 }
 
