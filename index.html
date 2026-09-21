@@ -611,16 +611,27 @@ async function renderMonthlySummary(){
       "STSM":"STSM"
     };
 
+    let totalN=0;
+let totalMin=0;
+let totalEuro=0;
     let html="";
 
     ["AR","MAX","TN","STSM"].forEach(g=>{
       const v=gyms[g];
+      totalN += v.n;
+totalMin += v.min;
+totalEuro += v.euro;
       html+=`
         <div class="gymrow">
           <b>${names[g]}</b>
           <span>${v.n} lez. · ${Math.floor(v.min/60)}h ${v.min%60}m · <b>€${v.euro}</b></span>
         </div>`;
     });
+    html+=`
+  <div class="gymrow" style="margin-top:10px;border-top:1px solid #ddd;padding-top:10px">
+    <b>Totale mese</b>
+    <span>${totalN} lez. · ${Math.floor(totalMin/60)}h ${totalMin%60}m · <b>€${totalEuro}</b></span>
+  </div>`;
 
     const monthName = monthDate.toLocaleDateString("it-IT",{
       month:"long",
