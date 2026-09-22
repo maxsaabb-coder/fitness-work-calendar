@@ -764,7 +764,8 @@ async function loadWeekFromSupabase(){
     if(error) throw error;
 
     (data || []).forEach(item => {
-      const key = item.lesson_date+"_"+String(item.start_time).slice(0,5)+"_"+item.gym_code+"_"+item.lesson_name;
+     const appGymCode = item.gym_code === "AR" ? "A&R" : item.gym_code;
+     const key = item.lesson_date+"_"+String(item.start_time).slice(0,5)+"_"+appGymCode+"_"+item.lesson_name;
 
       localStorage.setItem("olga_"+key, JSON.stringify({
         status: statusFromDb(item.status),
