@@ -546,14 +546,18 @@ function renderSummary(){
    if(!gyms[r[3]])gyms[r[3]]={n:0,min:0,euro:0};
 
    if(d.status==="Svolta"){
-     done++;
-     min+=r[5];
-     money+=r[6];
-     gyms[r[3]].n++;
-     gyms[r[3]].min+=r[5];
-     gyms[r[3]].euro+=r[6];
-   } else if(d.status!=="Da confermare"){
-     notDone++;
+  gyms[r[3]].n++;
+  gyms[r[3]].min+=r[5];
+  gyms[r[3]].euro+=r[6];
+
+  if(r[0]===selectedDay){
+    done++;
+    min+=r[5];
+    money+=r[6];
+  }
+} else if(d.status!=="Da confermare" && r[0]===selectedDay){
+  notDone++;
+}
    }
  });
 
