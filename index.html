@@ -665,11 +665,35 @@ totalEuro += v.euro;
  "Settimana "+fmtDate(currentWeek)+" – "+fmtDate(end);
 }
 
-function render(){
+function renderDailySummary(){
+  let done=0,min=0,money=0,notDone=0;
+
+  schedule
+    .filter(r=>r[0]===selectedDay)
+    .forEach(r=>{
+      const d=getData(keyFor(r));
+
+      if(d.status==="Svolta"){
+        done++;
+        min+=r[5];
+        money+=r[6];
+      } else if(d.status!=="Da confermare"){
+        notDone++;
+      }
+    });
+
+  document.getElementById("doneCount").textContent=done;
+  document.getElementById("hours").textContent=
+    Math.floor(min/60)+"h "+(min%60)+"m";
+  document.getElementById("money").textContent="€"+money;
+  document.getElementById("notDone").textContent=notDone;
+}
+  function render(){
  renderWeekLabel();
  renderDays();
  renderLessons();
  renderSummary();
+  renderDailySummary();
   renderMonthlySummary();
  document.getElementById("allDoneBtn").style.display = isReadOnly ? "none" : "";
 }
