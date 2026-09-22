@@ -247,7 +247,7 @@ footer{
 <button class="today" onclick="goToday()">Torna a oggi</button>
 
 <div class="summary">
-<div class="card"><small>Totale ore da fare</small><strong id="plannedHours">0h</strong></div>
+<div class="card"><small>Lezioni previste</small><strong id="plannedLessons">0</strong></div>
 <div class="card"><small>Svolte</small><strong id="doneCount">0</strong></div>
 <div class="card"><small>Non svolte</small><strong id="notDone">0</strong></div>
 <div class="card"><small>Ore effettive</small><strong id="hours">0h</strong></div>
@@ -667,13 +667,13 @@ totalEuro += v.euro;
 }
 
 function renderDailySummary(){
-  let done=0,min=0,money=0,notDone=0,plannedMin=0;
+  let done=0,min=0,money=0,notDone=0,plannedLessons=0;
 
   schedule
     .filter(r=>r[0]===selectedDay)
     .forEach(r=>{
       const d=getData(keyFor(r));
-      plannedMin+=r[5];
+      plannedLessons++;
 
       if(d.status==="Svolta"){
         done++;
@@ -684,8 +684,7 @@ function renderDailySummary(){
       }
     });
 
-  document.getElementById("plannedHours").textContent=
-  Math.floor(plannedMin/60)+"h "+(plannedMin%60)+"m";
+  document.getElementById("plannedLessons").textContent=plannedLessons;
   document.getElementById("doneCount").textContent=done;
   document.getElementById("hours").textContent=
     Math.floor(min/60)+"h "+(min%60)+"m";
