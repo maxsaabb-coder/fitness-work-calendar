@@ -388,7 +388,7 @@ async function syncToSupabase(key,data,row){
     const parts = key.split("_");
     const lessonDate = parts[0];
     const startTime = parts[1];
-    const gymCode = parts[2];
+    const gymCode = parts[2] === "A&R" ? "AR" : parts[2];
     const lessonName = parts.slice(3).join("_");
     const { data: existing, error: findError } = await supabaseClient
     .from("lessons")
