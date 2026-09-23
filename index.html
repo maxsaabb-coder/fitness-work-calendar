@@ -827,6 +827,7 @@ if(d.min===0){
   ];
 
   const totalKm = travel.reduce((s,d)=>s+d.km,0);
+    const totalWalk = travel.reduce((s,d)=>s+d.walk,0);
   const avgKm = totalKm / travel.length;
 
   const mostTrips = travel.reduce((a,b)=>b.trips>a.trips?b:a);
@@ -836,7 +837,8 @@ if(d.min===0){
     <div style="text-align:center;margin-bottom:16px">
       <b>Più spostamenti: ${mostTrips.name} · ${mostTrips.trips}</b><br>
       <b>Più km: ${mostKm.name} · ${mostKm.km.toFixed(1)} km</b><br>
-      <span>Media: ${avgKm.toFixed(1)} km/giorno</span>
+      <span>Media auto: ${avgKm.toFixed(1)} km/giorno</span><br>
+<span>Totale settimana: ${totalKm.toFixed(1)} km auto · ${totalWalk.toFixed(1)} km a piedi</span>
     </div>
   `;
 
