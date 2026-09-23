@@ -776,11 +776,24 @@ totalEuro += v.euro;
 
   const maxMin = Math.max(...Object.values(days).map(d=>d.min),1);
     const busiest = Object.values(days).reduce((a,b)=>b.min>a.min?b:a);
+    const activeDays = Object.values(days).filter(d=>d.min>0);
+const leastBusy = activeDays.length
+  ? activeDays.reduce((a,b)=>b.min<a.min?b:a)
+  : null;
 
   let html="";
 
   Object.values(days).forEach(d=>{
     const pct = Math.round((d.min/maxMin)*100);
+    let barColor = "#111827";
+
+if(d.min===0){
+  barColor = "#d1d5db";
+}else if(d.name===busiest.name){
+  barColor = "#dc2626";
+}else if(leastBusy && d.name===leastBusy.name){
+  barColor = "#16a34a";
+}
     html+=`
       <div style="margin:12px 0">
         <div style="display:flex;justify-content:space-between;margin-bottom:4px">
@@ -788,14 +801,15 @@ totalEuro += v.euro;
           <span>${Math.floor(d.min/60)}h ${d.min%60}m</span>
         </div>
         <div style="height:18px;background:#e5e7eb;border-radius:9px;overflow:hidden">
-          <div style="height:100%;width:${pct}%;background:#111827;border-radius:9px"></div>
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:9px"></div>
         </div>
       </div>`;
   });
 
   html =
+  html =
   `<div style="text-align:center;margin-bottom:16px;font-weight:700">
-    Giorno più impegnativo: ${busiest.name} · ${Math.floor(busiest.min/60)}h ${busiest.min%60}m
+    ${busiest.name} · ${Math.floor(busiest.min/60)}h ${busiest.min%60}m
   </div>` + html;
     document.getElementById("busyDayChart").innerHTML = html;
 }
