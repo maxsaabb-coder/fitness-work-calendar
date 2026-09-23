@@ -284,6 +284,10 @@ footer{
     <button onclick="changeYear(1)" style="width:44px;height:44px;border:none;border-radius:12px;font-size:22px">›</button>
   </div>
   <div id="yearTotals"></div>
+      <div class="gymTotals" style="margin-top:24px">
+  <h3 style="text-align:center">Giorno più impegnativo</h3>
+  <div id="busyDayChart"></div>
+</div>
 </div>
 </div>
 </div>
@@ -754,6 +758,42 @@ totalEuro += v.euro;
       "<div>Impossibile caricare il riepilogo annuale.</div>";
   }
 }
+  function renderBusyDayChart(){
+  const days = {
+    1:{name:"Lunedì",min:0},
+    2:{name:"Martedì",min:0},
+    3:{name:"Mercoledì",min:0},
+    4:{name:"Giovedì",min:0},
+    5:{name:"Venerdì",min:0}
+  };
+
+  schedule.forEach(r=>{
+    const d=getData(keyFor(r));
+    if(d.status==="Svolta"){
+      days[r[0]].min += r[5];
+    }
+  });
+
+  const maxMin = Math.max(...Object.values(days).map(d=>d.min),1);
+
+  let html="";
+
+  Object.values(days).forEach(d=>{
+    const pct = Math.round((d.min/maxMin)*100);
+    html+=`
+      <div style="margin:12px 0">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <b>${d.name}</b>
+          <span>${Math.floor(d.min/60)}h ${d.min%60}m</span>
+        </div>
+        <div style="height:18px;background:#e5e7eb;border-radius:9px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:#111827;border-radius:9px"></div>
+        </div>
+      </div>`;
+  });
+
+  document.getElementById("busyDayChart").innerHTML = html;
+}
   function renderWeekLabel(){
  let end=new Date(currentWeek);
  end.setDate(end.getDate()+6);
@@ -796,6 +836,7 @@ function renderDailySummary(){
   renderDailySummary();
   renderMonthlySummary();
   renderYearlySummary();
+    renderBusyDayChart();
  document.getElementById("allDoneBtn").style.display = isReadOnly ? "none" : "";
 }
 
