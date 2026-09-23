@@ -882,24 +882,6 @@ if(d.min===0){
   document.getElementById("travelChart").innerHTML = html;
 }
 
-  html += `
-    <div style="margin:12px 0">
-      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-        <b>${d.name}</b>
-        <span>${d.km.toFixed(1)} km auto${d.walk ? ` · ${d.walk.toFixed(1)} km a piedi` : ""}</span>
-      </div>
-      <div style="height:18px;background:#e5e7eb;border-radius:9px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${barColor};border-radius:9px"></div>
-      </div>
-      <div style="text-align:right;font-size:14px;margin-top:4px;color:#6b7280">
-        ${d.trips} spost.
-      </div>
-    </div>
-  `;
-});
-
-  document.getElementById("travelChart").innerHTML = html;
-}
   function renderWeekLabel(){
  let end=new Date(currentWeek);
  end.setDate(end.getDate()+6);
