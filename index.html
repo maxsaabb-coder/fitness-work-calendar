@@ -827,28 +827,76 @@ if(d.min===0){
   ];
 
   const totalKm = travel.reduce((s,d)=>s+d.km,0);
-    const totalWalk = travel.reduce((s,d)=>s+d.walk,0);
+  const totalWalk = travel.reduce((s,d)=>s+d.walk,0);
   const avgKm = totalKm / travel.length;
 
   const mostTrips = travel.reduce((a,b)=>b.trips>a.trips?b:a);
   const mostKm = travel.reduce((a,b)=>b.km>a.km?b:a);
+
+  const maxKm = Math.max(...travel.map(d=>d.km),1);
+  const activeKmDays = travel.filter(d=>d.km>0);
+  const leastKm = activeKmDays.length
+    ? activeKmDays.reduce((a,b)=>b.km<a.km?b:a)
+    : null;
 
   let html = `
     <div style="text-align:center;margin-bottom:16px">
       <b>Più spostamenti: ${mostTrips.name} · ${mostTrips.trips}</b><br>
       <b>Più km: ${mostKm.name} · ${mostKm.km.toFixed(1)} km</b><br>
       <span>Media auto: ${avgKm.toFixed(1)} km/giorno</span><br>
-<span>Totale settimana: ${totalKm.toFixed(1)} km auto · ${totalWalk.toFixed(1)} km a piedi</span>
+      <span>Totale settimana: ${totalKm.toFixed(1)} km auto · ${totalWalk.toFixed(1)} km a piedi</span>
     </div>
   `;
 
   travel.forEach(d=>{
+    const pct = Math.round((d.km/maxKm)*100);
+
+    let barColor = "#111827";
+
+    if(d.km===0){
+      barColor = "#d1d5db";
+    }else if(d.name===mostKm.name){
+      barColor = "#dc2626";
+    }else if(leastKm && d.name===leastKm.name){
+      barColor = "#16a34a";
+    }
+
     html += `
-      <div class="gymrow">
-        <b>${d.name}</b>
-        <span>${d.trips} spost. · ${d.km.toFixed(1)} km auto${d.walk ? ` · ${d.walk.toFixed(1)} km a piedi` : ""}</span>
-      </div>`;
+      <div style="margin:12px 0">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <b>${d.name}</b>
+          <span>${d.km.toFixed(1)} km auto${d.walk ? ` · ${d.walk.toFixed(1)} km a piedi` : ""}</span>
+        </div>
+
+        <div style="height:18px;background:#e5e7eb;border-radius:9px;overflow:hidden">
+          <div style="height:100%;width:${pct}%;background:${barColor};border-radius:9px"></div>
+        </div>
+
+        <div style="text-align:right;font-size:14px;margin-top:4px;color:#6b7280">
+          ${d.trips} spost.
+        </div>
+      </div>
+    `;
   });
+
+  document.getElementById("travelChart").innerHTML = html;
+}
+
+  html += `
+    <div style="margin:12px 0">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <b>${d.name}</b>
+        <span>${d.km.toFixed(1)} km auto${d.walk ? ` · ${d.walk.toFixed(1)} km a piedi` : ""}</span>
+      </div>
+      <div style="height:18px;background:#e5e7eb;border-radius:9px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${barColor};border-radius:9px"></div>
+      </div>
+      <div style="text-align:right;font-size:14px;margin-top:4px;color:#6b7280">
+        ${d.trips} spost.
+      </div>
+    </div>
+  `;
+});
 
   document.getElementById("travelChart").innerHTML = html;
 }
