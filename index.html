@@ -268,7 +268,7 @@ footer{
 <div id="lessons"></div>
 
 <div class="gymTotals">
-<h3>Riepilogo settimana</h3>
+<h3 style="text-align:center">Riepilogo settimana</h3>
 <div id="gymTotals"></div>
   <div class="gymTotals" style="margin-top:24px">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -577,7 +577,12 @@ function renderSummary(){
    <span>${v.n} lez. · ${Math.floor(v.min/60)}h ${v.min%60}m · <b>€${v.euro}</b></span>
    </div>`;
  });
- document.getElementById("gymTotals").innerHTML=html;
+ html+=`
+  <div class="gymrow" style="margin-top:10px;border-top:1px solid #ddd;padding-top:10px">
+    <b>Totale settimana</b>
+    <span>${done} lez. · ${Math.floor(min/60)}h ${min%60}m · <b>€${money}</b></span>
+  </div>`;
+  document.getElementById("gymTotals").innerHTML=html;
 }
 
 function changeMonth(delta){
