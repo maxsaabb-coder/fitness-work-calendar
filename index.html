@@ -277,6 +277,14 @@ footer{
   <button onclick="changeMonth(1)" style="width:44px;height:44px;border:none;border-radius:12px;font-size:22px">›</button>
 </div>
   <div id="monthTotals"></div>
+    <div class="gymTotals" style="margin-top:24px">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+    <button onclick="changeYear(-1)" style="width:44px;height:44px;border:none;border-radius:12px;font-size:22px">‹</button>
+    <h3 id="yearTitle" style="margin:0;text-align:center;flex:1">Riepilogo annuale</h3>
+    <button onclick="changeYear(1)" style="width:44px;height:44px;border:none;border-radius:12px;font-size:22px">›</button>
+  </div>
+  <div id="yearTotals"></div>
+</div>
 </div>
 </div>
 
@@ -353,6 +361,7 @@ const dayNames=["","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì"];
 let selectedDay=1;
 let currentWeek=getMonday(new Date());
   let summaryMonth = new Date();
+  let summaryYear = new Date().getFullYear();
 let selected=null;
 
 function getMonday(d){
@@ -589,6 +598,10 @@ function changeMonth(delta){
   summaryMonth.setMonth(summaryMonth.getMonth() + delta);
   renderMonthlySummary();
 }
+  function changeYear(delta){
+  summaryYear += delta;
+  renderYearlySummary();
+}
   async function renderMonthlySummary(){
   try{
     const monthDate = new Date(summaryMonth);
@@ -669,6 +682,78 @@ totalEuro += v.euro;
       "<div>Impossibile caricare il riepilogo mensile.</div>";
   }
 }
+  async function renderYearlySummary(){
+  try{
+    const start = summaryYear + "-01-01";
+    const end = summaryYear + "-12-31";
+
+    const { data, error } = await supabaseClient
+      .from("lessons")
+      .select("lesson_date,gym_code,minutes,price,status")
+      .gte("lesson_date", start)
+      .lte("lesson_date", end)
+      .eq("status", "done");
+
+    if(error) throw error;
+
+    const gyms = {
+      "AR": {n:0,min:0,euro:0},
+      "MAX": {n:0,min:0,euro:0},
+      "TN": {n:0,min:0,euro:0},
+      "STSM": {n:0,min:0,euro:0}
+    };
+
+    let totalN=0;
+    let totalMin=0;
+    let totalEuro=0;
+
+    (data || []).forEach(r=>{
+      if(!gyms[r.gym_code]) gyms[r.gym_code]={n:0,min:0,euro:0};
+
+      gyms[r.gym_code].n++;
+      gyms[r.gym_code].min += Number(r.minutes || 0);
+      gyms[r.gym_code].euro += Number(r.price || 0);
+
+      totalN++;
+      totalMin += Number(r.minutes || 0);
+      totalEuro += Number(r.price || 0);
+    });
+
+    const names = {
+      "AR":"A&R",
+      "MAX":"MAX",
+      "TN":"TN",
+      "STSM":"STSM"
+    };
+
+    let html="";
+
+    ["AR","MAX","TN","STSM"].forEach(g=>{
+      const v=gyms[g];
+      html+=`
+        <div class="gymrow">
+          <b>${names[g]}</b>
+          <span>${v.n} lez. · ${Math.floor(v.min/60)}h ${v.min%60}m · <b>€${v.euro}</b></span>
+        </div>`;
+    });
+
+    html+=`
+      <div class="gymrow" style="margin-top:10px;border-top:1px solid #ddd;padding-top:10px">
+        <b>Totale anno</b>
+        <span>${totalN} lez. · ${Math.floor(totalMin/60)}h ${totalMin%60}m · <b>€${totalEuro}</b></span>
+      </div>`;
+
+    document.getElementById("yearTitle").textContent =
+      "Riepilogo " + summaryYear;
+
+    document.getElementById("yearTotals").innerHTML = html;
+
+  }catch(err){
+    console.error("Errore riepilogo annuale:",err);
+    document.getElementById("yearTotals").innerHTML =
+      "<div>Impossibile caricare il riepilogo annuale.</div>";
+  }
+}
   function renderWeekLabel(){
  let end=new Date(currentWeek);
  end.setDate(end.getDate()+6);
@@ -710,6 +795,7 @@ function renderDailySummary(){
  renderSummary();
   renderDailySummary();
   renderMonthlySummary();
+  renderYearlySummary();
  document.getElementById("allDoneBtn").style.display = isReadOnly ? "none" : "";
 }
 
