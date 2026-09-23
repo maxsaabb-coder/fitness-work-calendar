@@ -775,6 +775,7 @@ totalEuro += v.euro;
   });
 
   const maxMin = Math.max(...Object.values(days).map(d=>d.min),1);
+    const busiest = Object.values(days).reduce((a,b)=>b.min>a.min?b:a);
 
   let html="";
 
@@ -792,7 +793,11 @@ totalEuro += v.euro;
       </div>`;
   });
 
-  document.getElementById("busyDayChart").innerHTML = html;
+  html =
+  `<div style="text-align:center;margin-bottom:16px;font-weight:700">
+    Giorno più impegnativo: ${busiest.name} · ${Math.floor(busiest.min/60)}h ${busiest.min%60}m
+  </div>` + html;
+    document.getElementById("busyDayChart").innerHTML = html;
 }
   function renderWeekLabel(){
  let end=new Date(currentWeek);
