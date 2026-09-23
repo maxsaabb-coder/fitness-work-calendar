@@ -287,6 +287,10 @@ footer{
       <div class="gymTotals" style="margin-top:24px">
   <h3 style="text-align:center">Giorno più impegnativo</h3>
   <div id="busyDayChart"></div>
+        <div class="gymTotals" style="margin-top:24px">
+  <h3 style="text-align:center">Spostamenti e chilometri</h3>
+  <div id="travelChart"></div>
+</div>
 </div>
 </div>
 </div>
@@ -813,6 +817,39 @@ if(d.min===0){
   </div>` + html;
     document.getElementById("busyDayChart").innerHTML = html;
 }
+  function renderTravelChart(){
+  const travel = [
+    {name:"Lunedì", trips:6, km:5.6, walk:1.6},
+    {name:"Martedì", trips:4, km:12.1, walk:0},
+    {name:"Mercoledì", trips:5, km:18.1, walk:0},
+    {name:"Giovedì", trips:7, km:16.7, walk:0},
+    {name:"Venerdì", trips:5, km:12.7, walk:0}
+  ];
+
+  const totalKm = travel.reduce((s,d)=>s+d.km,0);
+  const avgKm = totalKm / travel.length;
+
+  const mostTrips = travel.reduce((a,b)=>b.trips>a.trips?b:a);
+  const mostKm = travel.reduce((a,b)=>b.km>a.km?b:a);
+
+  let html = `
+    <div style="text-align:center;margin-bottom:16px">
+      <b>Più spostamenti: ${mostTrips.name} · ${mostTrips.trips}</b><br>
+      <b>Più km: ${mostKm.name} · ${mostKm.km.toFixed(1)} km</b><br>
+      <span>Media: ${avgKm.toFixed(1)} km/giorno</span>
+    </div>
+  `;
+
+  travel.forEach(d=>{
+    html += `
+      <div class="gymrow">
+        <b>${d.name}</b>
+        <span>${d.trips} spost. · ${d.km.toFixed(1)} km auto${d.walk ? ` · ${d.walk.toFixed(1)} km a piedi` : ""}</span>
+      </div>`;
+  });
+
+  document.getElementById("travelChart").innerHTML = html;
+}
   function renderWeekLabel(){
  let end=new Date(currentWeek);
  end.setDate(end.getDate()+6);
@@ -856,6 +893,7 @@ function renderDailySummary(){
   renderMonthlySummary();
   renderYearlySummary();
     renderBusyDayChart();
+    renderTravelChart();
  document.getElementById("allDoneBtn").style.display = isReadOnly ? "none" : "";
 }
 
