@@ -268,7 +268,7 @@ footer{
 <div id="lessons"></div>
 
 <div class="gymTotals">
-<h3 style="text-align:center">Riepilogo settimana</h3>
+<h3 id="weekSummaryTitle" style="text-align:center">Riepilogo settimana</h3>
 <div id="gymTotals"></div>
   <div class="gymTotals" style="margin-top:24px">
   <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
@@ -674,6 +674,8 @@ totalEuro += v.euro;
  end.setDate(end.getDate()+6);
  document.getElementById("weekLabel").textContent=
  "Settimana "+fmtDate(currentWeek)+" – "+fmtDate(end);
+    document.getElementById("weekSummaryTitle").textContent=
+  "Riepilogo settimana "+fmtDate(currentWeek)+" – "+fmtDate(end);
 }
 
 function renderDailySummary(){
