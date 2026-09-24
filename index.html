@@ -1028,10 +1028,22 @@ async function loadWeekFromSupabase(){
         sub: item.substituted_by || ""
       }));
     });
+    render();
   } catch(err) {
     console.error("Errore lettura Supabase:", err);
   }
 }
+  document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    loadWeekFromSupabase();
+  }
+});
+
+setInterval(() => {
+  if (!document.hidden) {
+    loadWeekFromSupabase();
+  }
+}, 15000);
   function changeWeek(days){
  currentWeek.setDate(currentWeek.getDate()+days);
  loadWeekFromSupabase().then(render);
