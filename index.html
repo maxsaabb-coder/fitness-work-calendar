@@ -153,6 +153,28 @@ main{
   cursor:pointer
 }
 
+.adminToggle{
+  width:100%;
+  border:1px solid #d1d5db;
+  border-radius:12px;
+  padding:10px 12px;
+  background:#fff;
+  color:#111827;
+  font-weight:700;
+  margin:0 0 12px;
+  cursor:pointer
+}
+.adminBadge{
+  display:none;
+  margin:0 0 12px;
+  padding:10px 12px;
+  border-radius:10px;
+  background:#fef3c7;
+  color:#92400e;
+  font-weight:700;
+  text-align:center
+}
+
 .gymTotals{
   margin-top:20px
 }
@@ -264,6 +286,8 @@ footer{
 <h2 class="daytitle" id="dayTitle"></h2>
 
 <button id="allDoneBtn" class="allDone" onclick="allDone()">✓ Segna tutte svolte</button>
+<button id="adminToggleBtn" class="adminToggle" onclick="toggleAdminMode()" style="display:none">Accesso amministratore</button>
+<div id="adminBadge" class="adminBadge">Modalità amministratore attiva per 30 minuti</div>
 
 <div id="lessons"></div>
 
@@ -401,7 +425,7 @@ function getData(key){
 }
 
 function setData(key,data){
-  if (isReadOnly) return;
+  if (isReadOnly && !adminMode) return;
   localStorage.setItem("olga_"+key,JSON.stringify(data));
   syncToSupabase(key,data,schedule.find(r=>keyFor(r)===key));  
 }
@@ -469,6 +493,9 @@ function renderDays(){
   const SUPABASE_KEY = "sb_publishable_ELXt9cC6F9NiYpwPL_AhHg_DEbHm0im";
   const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   let isReadOnly = false;
+  let adminMode = false;
+  let adminUntil = 0;
+  const ADMIN_DURATION_MS = 30 * 60 * 1000;
 
   async function login() {
   const email = document.getElementById("loginEmail").value.trim();
@@ -487,6 +514,7 @@ function renderDays(){
     return;
   }
     isReadOnly = data.user?.email === "maxsaabb@gmail.com";
+  syncAccessUI();
 
   document.getElementById("loginBox").style.display = "none";
   loadWeekFromSupabase().then(render);
@@ -498,6 +526,7 @@ function renderDays(){
   if (data.session) {
     document.getElementById("loginBox").style.display = "none";
     isReadOnly = data.session.user?.email === "maxsaabb@gmail.com";
+    syncAccessUI();
   } else {
     document.getElementById("loginBox").style.display = "block";
   }
@@ -505,10 +534,82 @@ function renderDays(){
 
 supabaseClient.auth.onAuthStateChange((event, session) => {
   isReadOnly = session?.user?.email === "maxsaabb@gmail.com";
+  if (!session) { adminMode = false; adminUntil = 0; }
+  syncAccessUI();
   document.getElementById("loginBox").style.display = session ? "none" : "block";
 });
 
 checkSession();
+
+function syncAccessUI(){
+  const adminBtn = document.getElementById("adminToggleBtn");
+  const badge = document.getElementById("adminBadge");
+  const allDoneBtn = document.getElementById("allDoneBtn");
+
+  const maxAccount = isReadOnly;
+  const active = maxAccount && adminMode && Date.now() < adminUntil;
+
+  if (maxAccount && adminMode && !active) {
+    adminMode = false;
+    adminUntil = 0;
+  }
+
+  if (adminBtn) {
+    adminBtn.style.display = maxAccount ? "" : "none";
+    adminBtn.textContent = active ? "Disattiva modalità amministratore" : "Accesso amministratore";
+  }
+
+  if (badge) badge.style.display = active ? "block" : "none";
+  if (allDoneBtn) allDoneBtn.style.display = (maxAccount && !active) ? "none" : "";
+}
+
+function toggleAdminMode(){
+  if (!isReadOnly) return;
+
+  const active = adminMode && Date.now() < adminUntil;
+  if (active) {
+    adminMode = false;
+    adminUntil = 0;
+    render();
+    return;
+  }
+
+  const expected = localStorage.getItem("olga_admin_pin");
+
+  if (!expected) {
+    const newPin = prompt("Crea un PIN amministratore di almeno 4 cifre");
+    if (!newPin || newPin.length < 4) {
+      alert("PIN non valido.");
+      return;
+    }
+    const confirmPin = prompt("Ripeti il PIN amministratore");
+    if (newPin !== confirmPin) {
+      alert("I PIN non coincidono.");
+      return;
+    }
+    localStorage.setItem("olga_admin_pin", newPin);
+  } else {
+    const pin = prompt("Inserisci il PIN amministratore");
+    if (pin === null) return;
+    if (pin !== expected) {
+      alert("PIN amministratore non corretto.");
+      return;
+    }
+  }
+
+  adminMode = true;
+  adminUntil = Date.now() + ADMIN_DURATION_MS;
+  render();
+  alert("Modalità amministratore attiva per 30 minuti.");
+}
+
+setInterval(() => {
+  if (adminMode && Date.now() >= adminUntil) {
+    adminMode = false;
+    adminUntil = 0;
+    render();
+  }
+}, 30000);
 
 function statusToDb(s){
   if(s==="Svolta") return "done";
@@ -543,7 +644,7 @@ function renderLessons(){
     <div class="gym">${r[3]} · ${r[5]} min</div>
     <div class="status">${data.status}${extra}</div>
     ${data.note?`<div class="gym">Nota: ${data.note}</div>`:""}
-    ${isReadOnly ? "" : `
+    ${(isReadOnly && !adminMode) ? "" : `
 <div class="actions">
   <button onclick="quickDone(${i})">✓ Svolta</button>
   <button onclick="openModal(${i})">Modifica</button>
@@ -811,7 +912,6 @@ if(d.min===0){
   });
 
   html =
-  html =
   `<div style="text-align:center;margin-bottom:16px;font-weight:700">
     ${busiest.name} · ${Math.floor(busiest.min/60)}h ${busiest.min%60}m
   </div>` + html;
@@ -926,7 +1026,7 @@ function renderDailySummary(){
   renderYearlySummary();
     renderBusyDayChart();
     renderTravelChart();
- document.getElementById("allDoneBtn").style.display = isReadOnly ? "none" : "";
+ syncAccessUI();
 }
 
 function quickDone(index){
