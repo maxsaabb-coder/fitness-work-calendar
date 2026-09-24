@@ -425,7 +425,13 @@ function getData(key){
 }
 
 function setData(key,data){
-  if (isReadOnly && !adminMode) return;
+  if (isReadOnly && (!adminMode || Date.now() >= adminUntil)) {
+    adminMode = false;
+    adminUntil = 0;
+    syncAccessUI();
+    alert("La modalità amministratore non è attiva o è scaduta.");
+    return;
+  }
   localStorage.setItem("olga_"+key,JSON.stringify(data));
   syncToSupabase(key,data,schedule.find(r=>keyFor(r)===key));  
 }
@@ -471,8 +477,12 @@ async function syncToSupabase(key,data,row){
         .insert([lessonData]);
       if (error) throw error;
       }
+      return true;
     } catch (err) {
-    console.error("Errore Supabase:", err);
+      console.error("Errore Supabase:", err);
+      alert("La modifica non è stata salvata sul database. I dati verranno ricaricati.");
+      loadWeekFromSupabase();
+      return false;
     }
   }
 
@@ -495,121 +505,196 @@ function renderDays(){
   let isReadOnly = false;
   let adminMode = false;
   let adminUntil = 0;
-  const ADMIN_DURATION_MS = 30 * 60 * 1000;
+
+  async function refreshAdminStatus(){
+    if (!isReadOnly) {
+      adminMode = false;
+      adminUntil = 0;
+      syncAccessUI();
+      return;
+    }
+
+    const { data, error } = await supabaseClient.rpc("get_max_admin_status");
+    if (error) {
+      console.error("Errore stato amministratore:", error);
+      adminMode = false;
+      adminUntil = 0;
+      syncAccessUI();
+      return;
+    }
+
+    adminMode = !!data?.active;
+    adminUntil = data?.expires_at ? new Date(data.expires_at).getTime() : 0;
+    syncAccessUI();
+  }
 
   async function login() {
-  const email = document.getElementById("loginEmail").value.trim();
-  const password = document.getElementById("loginPassword").value;
-  const errorBox = document.getElementById("loginError");
+    const email = document.getElementById("loginEmail").value.trim();
+    const password = document.getElementById("loginPassword").value;
+    const errorBox = document.getElementById("loginError");
 
-  errorBox.textContent = "";
+    errorBox.textContent = "";
 
-  const { data, error } = await supabaseClient.auth.signInWithPassword({
-    email: email,
-    password: password
-  });
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
 
-  if (error) {
-    errorBox.textContent = "Email o password non corretti.";
-    return;
-  }
+    if (error) {
+      errorBox.textContent = "Email o password non corretti.";
+      return;
+    }
+
     isReadOnly = data.user?.email === "maxsaabb@gmail.com";
-  syncAccessUI();
-
-  document.getElementById("loginBox").style.display = "none";
-  loadWeekFromSupabase().then(render);
-}
+    await refreshAdminStatus();
+    document.getElementById("loginBox").style.display = "none";
+    await loadWeekFromSupabase();
+  }
 
   async function checkSession() {
-  const { data } = await supabaseClient.auth.getSession();
+    const { data } = await supabaseClient.auth.getSession();
 
-  if (data.session) {
-    document.getElementById("loginBox").style.display = "none";
-    isReadOnly = data.session.user?.email === "maxsaabb@gmail.com";
-    syncAccessUI();
-  } else {
-    document.getElementById("loginBox").style.display = "block";
-  }
-}
-
-supabaseClient.auth.onAuthStateChange((event, session) => {
-  isReadOnly = session?.user?.email === "maxsaabb@gmail.com";
-  if (!session) { adminMode = false; adminUntil = 0; }
-  syncAccessUI();
-  document.getElementById("loginBox").style.display = session ? "none" : "block";
-});
-
-checkSession();
-
-function syncAccessUI(){
-  const adminBtn = document.getElementById("adminToggleBtn");
-  const badge = document.getElementById("adminBadge");
-  const allDoneBtn = document.getElementById("allDoneBtn");
-
-  const maxAccount = isReadOnly;
-  const active = maxAccount && adminMode && Date.now() < adminUntil;
-
-  if (maxAccount && adminMode && !active) {
-    adminMode = false;
-    adminUntil = 0;
+    if (data.session) {
+      document.getElementById("loginBox").style.display = "none";
+      isReadOnly = data.session.user?.email === "maxsaabb@gmail.com";
+      await refreshAdminStatus();
+    } else {
+      document.getElementById("loginBox").style.display = "block";
+      isReadOnly = false;
+      adminMode = false;
+      adminUntil = 0;
+      syncAccessUI();
+    }
   }
 
-  if (adminBtn) {
-    adminBtn.style.display = maxAccount ? "" : "none";
-    adminBtn.textContent = active ? "Disattiva modalità amministratore" : "Accesso amministratore";
+  supabaseClient.auth.onAuthStateChange((event, session) => {
+    isReadOnly = session?.user?.email === "maxsaabb@gmail.com";
+    if (!session) {
+      adminMode = false;
+      adminUntil = 0;
+      syncAccessUI();
+    } else {
+      refreshAdminStatus();
+    }
+    document.getElementById("loginBox").style.display = session ? "none" : "block";
+  });
+
+  checkSession();
+
+  function syncAccessUI(){
+    const adminBtn = document.getElementById("adminToggleBtn");
+    const badge = document.getElementById("adminBadge");
+    const allDoneBtn = document.getElementById("allDoneBtn");
+
+    const maxAccount = isReadOnly;
+    const active = maxAccount && adminMode && Date.now() < adminUntil;
+
+    if (maxAccount && adminMode && !active) {
+      adminMode = false;
+      adminUntil = 0;
+    }
+
+    if (adminBtn) {
+      adminBtn.style.display = maxAccount ? "" : "none";
+      adminBtn.textContent = active ? "Disattiva modalità amministratore" : "Accesso amministratore";
+    }
+
+    if (badge) badge.style.display = active ? "block" : "none";
+    if (allDoneBtn) allDoneBtn.style.display = (maxAccount && !active) ? "none" : "";
   }
 
-  if (badge) badge.style.display = active ? "block" : "none";
-  if (allDoneBtn) allDoneBtn.style.display = (maxAccount && !active) ? "none" : "";
-}
-
-function toggleAdminMode(){
-  if (!isReadOnly) return;
-
-  const active = adminMode && Date.now() < adminUntil;
-  if (active) {
-    adminMode = false;
-    adminUntil = 0;
-    render();
-    return;
+  function formatAdminLockTime(value){
+    if (!value) return "";
+    const d = new Date(value);
+    return d.toLocaleTimeString("it-IT", {hour:"2-digit", minute:"2-digit"});
   }
 
-  const expected = localStorage.getItem("olga_admin_pin");
+  async function toggleAdminMode(){
+    if (!isReadOnly) return;
 
-  if (!expected) {
-    const newPin = prompt("Crea un PIN amministratore di almeno 4 cifre");
-    if (!newPin || newPin.length < 4) {
-      alert("PIN non valido.");
+    await refreshAdminStatus();
+
+    if (adminMode && Date.now() < adminUntil) {
+      const { error } = await supabaseClient.rpc("disable_max_admin");
+      if (error) {
+        alert("Non sono riuscito a disattivare la modalità amministratore.");
+        return;
+      }
+      adminMode = false;
+      adminUntil = 0;
+      render();
       return;
     }
-    const confirmPin = prompt("Ripeti il PIN amministratore");
-    if (newPin !== confirmPin) {
-      alert("I PIN non coincidono.");
+
+    const { data: status, error: statusError } = await supabaseClient.rpc("get_max_admin_status");
+    if (statusError) {
+      alert("Impossibile verificare lo stato amministratore.");
       return;
     }
-    localStorage.setItem("olga_admin_pin", newPin);
-  } else {
-    const pin = prompt("Inserisci il PIN amministratore");
+
+    if (!status?.configured) {
+      const newPin = prompt("Crea un nuovo PIN amministratore di 6 cifre");
+      if (newPin === null) return;
+      if (!/^\d{6}$/.test(newPin)) {
+        alert("Il PIN deve contenere esattamente 6 cifre.");
+        return;
+      }
+
+      const confirmPin = prompt("Ripeti il nuovo PIN amministratore");
+      if (confirmPin !== newPin) {
+        alert("I PIN non coincidono.");
+        return;
+      }
+
+      const { data: setupResult, error: setupError } = await supabaseClient.rpc("setup_max_admin_pin", { p_pin: newPin });
+      if (setupError || !setupResult?.ok) {
+        alert(setupResult?.message || "Non sono riuscito a configurare il PIN amministratore.");
+        return;
+      }
+
+      adminMode = true;
+      adminUntil = setupResult.expires_at ? new Date(setupResult.expires_at).getTime() : 0;
+      render();
+      alert("PIN configurato. Modalità amministratore attiva per 30 minuti.");
+      return;
+    }
+
+    if (status?.locked_until && new Date(status.locked_until).getTime() > Date.now()) {
+      alert("Accesso temporaneamente bloccato fino alle " + formatAdminLockTime(status.locked_until) + ".");
+      return;
+    }
+
+    const pin = prompt("Inserisci il PIN amministratore di 6 cifre");
     if (pin === null) return;
-    if (pin !== expected) {
-      alert("PIN amministratore non corretto.");
+
+    const { data: result, error } = await supabaseClient.rpc("enable_max_admin", { p_pin: pin });
+    if (error) {
+      alert("Errore durante l'attivazione della modalità amministratore.");
       return;
     }
-  }
 
-  adminMode = true;
-  adminUntil = Date.now() + ADMIN_DURATION_MS;
-  render();
-  alert("Modalità amministratore attiva per 30 minuti.");
-}
+    if (!result?.ok) {
+      if (result?.locked_until) {
+        alert("Troppi tentativi errati. Accesso bloccato fino alle " + formatAdminLockTime(result.locked_until) + ".");
+      } else {
+        alert(result?.message || "PIN amministratore non corretto.");
+      }
+      return;
+    }
 
-setInterval(() => {
-  if (adminMode && Date.now() >= adminUntil) {
-    adminMode = false;
-    adminUntil = 0;
+    adminMode = true;
+    adminUntil = result.expires_at ? new Date(result.expires_at).getTime() : 0;
     render();
+    alert("Modalità amministratore attiva per 30 minuti.");
   }
-}, 30000);
+
+  setInterval(() => {
+    if (adminMode && Date.now() >= adminUntil) {
+      adminMode = false;
+      adminUntil = 0;
+      render();
+    }
+  }, 30000);
 
 function statusToDb(s){
   if(s==="Svolta") return "done";
@@ -644,7 +729,7 @@ function renderLessons(){
     <div class="gym">${r[3]} · ${r[5]} min</div>
     <div class="status">${data.status}${extra}</div>
     ${data.note?`<div class="gym">Nota: ${data.note}</div>`:""}
-    ${(isReadOnly && !adminMode) ? "" : `
+    ${(isReadOnly && (!adminMode || Date.now() >= adminUntil)) ? "" : `
 <div class="actions">
   <button onclick="quickDone(${i})">✓ Svolta</button>
   <button onclick="openModal(${i})">Modifica</button>
@@ -1136,6 +1221,7 @@ async function loadWeekFromSupabase(){
   document.addEventListener("visibilitychange", () => {
   if (!document.hidden) {
     loadWeekFromSupabase();
+    refreshAdminStatus();
   }
 });
 
@@ -1144,6 +1230,12 @@ setInterval(() => {
     loadWeekFromSupabase();
   }
 }, 15000);
+
+setInterval(() => {
+  if (!document.hidden && isReadOnly) {
+    refreshAdminStatus();
+  }
+}, 60000);
   function changeWeek(days){
  currentWeek.setDate(currentWeek.getDate()+days);
  loadWeekFromSupabase().then(render);
