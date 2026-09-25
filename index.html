@@ -277,9 +277,13 @@ main{
 .chartBox h4{margin:0 0 3px;font-size:16px}
 .chartSub{color:#6b7280;font-size:12px;margin-bottom:12px}
 .vBars{display:flex;align-items:flex-end;gap:10px;height:190px;padding:18px 6px 0;border-bottom:1px solid #d1d5db}
-.vBarItem{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0}
+.vBarItem{flex:1;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0;position:relative;cursor:pointer;transition:transform .18s ease}
+.vBarItem:hover{transform:translateY(-2px)}
 .vBarValue{font-size:11px;font-weight:700;margin-bottom:5px;white-space:nowrap}
-.vBar{width:min(52px,80%);min-height:4px;border-radius:7px 7px 0 0;background:#2563eb}
+.vBar{width:min(52px,80%);min-height:4px;border-radius:7px 7px 0 0;background:#2563eb;transition:filter .18s ease,box-shadow .18s ease}
+.vBarItem:hover .vBar{filter:brightness(1.05)}
+.vBar.best{box-shadow:0 0 0 3px #fde68a,0 5px 14px #0002}
+.vBarBestTag{font-size:9px;font-weight:800;color:#92400e;background:#fef3c7;border:1px solid #f59e0b;border-radius:999px;padding:2px 6px;margin-bottom:5px;white-space:nowrap}
 .vBarLabel{font-size:11px;font-weight:700;margin-top:6px;white-space:nowrap}
 .donutWrap{display:flex;align-items:center;gap:18px;min-height:190px}
 .donut{width:150px;height:150px;border-radius:50%;position:relative;flex:0 0 auto}
@@ -287,7 +291,10 @@ main{
 .donutCenter{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1;text-align:center;font-size:12px}
 .donutCenter strong{font-size:17px}
 .legend{flex:1;display:grid;gap:8px}
-.legendRow{display:flex;justify-content:space-between;gap:10px;font-size:12px}
+.legendRow{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:4px 6px;border-radius:7px;cursor:pointer}
+.legendRow:hover{background:#f9fafb}
+.legendRow.best{background:#fffbeb;outline:1px solid #fde68a}
+.legendBestTag{font-size:9px;font-weight:800;color:#92400e;background:#fef3c7;border:1px solid #f59e0b;border-radius:999px;padding:1px 5px;margin-left:6px}
 .legendName{display:flex;align-items:center;gap:7px;font-weight:700}
 .legendDot{width:10px;height:10px;border-radius:50%;display:inline-block}
 .chartNote{font-size:11px;color:#6b7280;line-height:1.45;margin-top:12px}
@@ -1366,13 +1373,27 @@ totalEuro += v.euro;
     return ["#2563eb","#16a34a","#f97316","#7c3aed","#0f766e"][i % 5];
   }
 
-  function verticalBars(items, formatter){
+  function safeJsText(v){
+    return String(v ?? "").replace(/\/g,"\\").replace(/'/g,"\'").replace(/\n/g," ");
+  }
+
+  function showChartDetail(title,label,value,detail=""){
+    const lines=[title, `${label}: ${value}`];
+    if(detail) lines.push(detail);
+    alert(lines.join("\n"));
+  }
+
+  function verticalBars(items, formatter, title="Dettaglio grafico"){
     const max = Math.max(...items.map(x=>x.value), 0);
+    const bestIndex = items.length ? items.reduce((best,x,i,a)=>x.value>a[best].value?i:best,0) : -1;
     return `<div class="vBars">${items.map((x,i)=>{
       const pct = max>0 ? Math.max(3,(x.value/max)*100) : 3;
-      return `<div class="vBarItem">
-        <div class="vBarValue">${formatter(x.value)}</div>
-        <div class="vBar" style="height:${pct}%;background:${x.color || chartColor(i)}"></div>
+      const valueText=formatter(x.value);
+      const detail=safeJsText(x.detail || "");
+      return `<div class="vBarItem" title="Tocca per il dettaglio" onclick="showChartDetail('${safeJsText(title)}','${safeJsText(x.label)}','${safeJsText(valueText)}','${detail}')">
+        ${i===bestIndex && x.value>0 ? '<div class="vBarBestTag">Migliore</div>' : ''}
+        <div class="vBarValue">${valueText}</div>
+        <div class="vBar ${i===bestIndex && x.value>0 ? 'best' : ''}" style="height:${pct}%;background:${x.color || chartColor(i)}"></div>
         <div class="vBarLabel">${x.label}</div>
       </div>`;
     }).join("")}</div>`;
@@ -1381,6 +1402,7 @@ totalEuro += v.euro;
   function donutChart(items,total){
     let cursor=0;
     const stops=[];
+    const bestIndex = items.length ? items.reduce((best,x,i,a)=>x.value>a[best].value?i:best,0) : -1;
     items.forEach((x,i)=>{
       const pct = total>0 ? (x.value/total)*100 : 0;
       const color=x.color || chartColor(i);
@@ -1390,9 +1412,11 @@ totalEuro += v.euro;
     if(cursor < 100) stops.push(`#e5e7eb ${cursor}% 100%`);
     const legend=items.map((x,i)=>{
       const pct=total>0 ? (x.value/total)*100 : 0;
-      return `<div class="legendRow">
-        <span class="legendName"><span class="legendDot" style="background:${x.color || chartColor(i)}"></span>${x.label}</span>
-        <span>${formatEuro(x.value)} · ${pct.toFixed(1).replace(".",",")}%</span>
+      const detail=safeJsText(x.detail || "");
+      const valueText=`${formatEuro(x.value)} · ${pct.toFixed(1).replace(".",",")}%`;
+      return `<div class="legendRow ${i===bestIndex && x.value>0 ? 'best' : ''}" title="Tocca per il dettaglio" onclick="showChartDetail('Ripartizione fatturato','${safeJsText(x.label)}','${safeJsText(valueText)}','${detail}')">
+        <span class="legendName"><span class="legendDot" style="background:${x.color || chartColor(i)}"></span>${x.label}${i===bestIndex && x.value>0 ? '<span class="legendBestTag">Quota maggiore</span>' : ''}</span>
+        <span>${valueText}</span>
       </div>`;
     }).join("");
     return `<div class="donutWrap">
@@ -1483,9 +1507,9 @@ totalEuro += v.euro;
       const avgHour=totalMin>0 ? totalGross/(totalMin/60) : 0;
 
       const gymOrder=["AR","MAX","TN","STSM"];
-      const grossGym=gymOrder.map(g=>({label:gymNames[g],value:gyms[g].gross,color:gymColors[g]}));
-      const hourlyGym=gymOrder.map(g=>({label:gymNames[g],value:gyms[g].min>0?gyms[g].gross/(gyms[g].min/60):0,color:gymColors[g]}));
-      const netDays=[1,2,3,4,5].map(wd=>({label:weekdayNames[wd],value:days[wd].gross-days[wd].cost,color:"#2563eb"}));
+      const grossGym=gymOrder.map(g=>({label:gymNames[g],value:gyms[g].gross,color:gymColors[g],detail:`${Math.round(gyms[g].min/60)}h ${gyms[g].min%60}m svolte · ${gyms[g].km.toFixed(1)} km attribuiti`}));
+      const hourlyGym=gymOrder.map(g=>({label:gymNames[g],value:gyms[g].min>0?gyms[g].gross/(gyms[g].min/60):0,color:gymColors[g],detail:`Fatturato ${formatEuro(gyms[g].gross)} · ${Math.floor(gyms[g].min/60)}h ${gyms[g].min%60}m`}));
+      const netDays=[1,2,3,4,5].map(wd=>({label:weekdayNames[wd],value:days[wd].gross-days[wd].cost,color:"#2563eb",detail:`Fatturato ${formatEuro(days[wd].gross)} · costo auto ${formatEuro(days[wd].cost)} · ${days[wd].km.toFixed(1)} km`}));
 
       target.innerHTML=`
         <div class="econCards">
@@ -1498,12 +1522,12 @@ totalEuro += v.euro;
           <div class="chartBox">
             <h4>Fatturato per palestra</h4>
             <div class="chartSub">Confronto del fatturato totale nel mese.</div>
-            ${verticalBars(grossGym,formatEuro)}
+            ${verticalBars(grossGym,formatEuro,"Fatturato per palestra")}
           </div>
           <div class="chartBox">
             <h4>Netto trasporti per giorno</h4>
             <div class="chartSub">Fatturato meno costo auto, raggruppato per giorno della settimana.</div>
-            ${verticalBars(netDays,formatEuro)}
+            ${verticalBars(netDays,formatEuro,"Netto trasporti per giorno")}
           </div>
           <div class="chartBox">
             <h4>Ripartizione fatturato</h4>
@@ -1513,10 +1537,10 @@ totalEuro += v.euro;
           <div class="chartBox">
             <h4>€/ora per palestra</h4>
             <div class="chartSub">Media oraria sulle sole lezioni svolte.</div>
-            ${verticalBars(hourlyGym,v=>formatEuro(v)+"/h")}
+            ${verticalBars(hourlyGym,v=>formatEuro(v)+"/h","€/ora per palestra")}
           </div>
         </div>
-        <div class="chartNote">I grafici usano i dati del mese selezionato e le lezioni effettivamente svolte. Il “netto trasporti” sottrae solo il costo auto e non comprende imposte, contributi o altri costi.</div>`;
+        <div class="chartNote">I grafici usano i dati del mese selezionato e le lezioni effettivamente svolte. La barra migliore di ogni confronto è evidenziata: tocca una barra o una voce della legenda per vedere il dettaglio. Il “netto trasporti” sottrae solo il costo auto e non comprende imposte, contributi o altri costi.</div>`;
     }catch(err){
       console.error("Errore grafici economici:",err);
       target.innerHTML=`<div class="gymrow"><span>Impossibile caricare i grafici economici.</span></div>`;
