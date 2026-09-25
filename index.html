@@ -359,6 +359,11 @@ footer{
   <div id="kmCostBox" class="kmSettings"></div>
   <div id="dailyProfitability"></div>
 </div>
+
+<div class="gymTotals" style="margin-top:24px">
+  <h3 id="gymProfitTitle" style="text-align:center">Redditività per palestra</h3>
+  <div id="gymProfitability"></div>
+</div>
 </div>
 </div>
 </div>
@@ -446,6 +451,16 @@ const standardTravelByWeekday = {
   3:{name:"Mercoledì",km:18.1,trips:5,walk:0},
   4:{name:"Giovedì",km:16.7,trips:7,walk:0},
   5:{name:"Venerdì",km:12.7,trips:5,walk:0}
+};
+
+// Ripartizione indicativa dei km standard tra le palestre visitate nel giorno.
+// I km sono attribuiti alla palestra di destinazione/ritorno; il lunedì A&R è a piedi.
+const gymTravelAllocationByWeekday = {
+  1:{"AR":0.0,"MAX":0.0,"TN":5.6,"STSM":0.0},
+  2:{"AR":0.8,"MAX":5.2,"TN":6.1,"STSM":0.0},
+  3:{"AR":0.8,"MAX":0.0,"TN":2.8,"STSM":14.5},
+  4:{"AR":0.8,"MAX":10.3,"TN":5.6,"STSM":0.0},
+  5:{"AR":2.4,"MAX":10.3,"TN":0.0,"STSM":0.0}
 };
 
 function getMonday(d){
@@ -846,6 +861,7 @@ function changeMonth(delta){
   summaryMonth.setMonth(summaryMonth.getMonth() + delta);
   renderMonthlySummary();
   renderDailyProfitability();
+  renderGymProfitability();
 }
   function changeYear(delta){
   summaryYear += delta;
@@ -986,6 +1002,7 @@ totalEuro += v.euro;
     }
 
     await renderDailyProfitability();
+    await renderGymProfitability();
     alert("Costo chilometrico aggiornato dal " + formatDateIt(effectiveFrom) + ".");
   }
 
@@ -1122,6 +1139,133 @@ totalEuro += v.euro;
       console.error("Errore redditività giornaliera:",err);
       costBox.innerHTML = "";
       target.innerHTML = `<div class="gymrow"><span>Impossibile caricare la redditività giornaliera.</span></div>`;
+    }
+  }
+
+
+  async function renderGymProfitability(){
+    const target = document.getElementById("gymProfitability");
+    const title = document.getElementById("gymProfitTitle");
+    if(!target || !title) return;
+
+    try{
+      const monthDate = new Date(summaryMonth);
+      const y = monthDate.getFullYear();
+      const m = monthDate.getMonth();
+      const first = new Date(y,m,1);
+      const last = new Date(y,m+1,0);
+      const start = iso(first);
+      const end = iso(last);
+
+      const [{data: lessons, error: lessonError}, {data: costs, error: costError}] = await Promise.all([
+        supabaseClient
+          .from("lessons")
+          .select("lesson_date,gym_code,minutes,price,status")
+          .gte("lesson_date", start)
+          .lte("lesson_date", end)
+          .eq("status", "done"),
+        supabaseClient
+          .from("km_cost_history")
+          .select("effective_from,cost_per_km")
+          .lte("effective_from", end)
+          .order("effective_from", {ascending:true})
+      ]);
+
+      if(lessonError) throw lessonError;
+      if(costError) throw costError;
+
+      const history = costs || [];
+      const names = {"AR":"A&R","MAX":"MAX","TN":"TN","STSM":"STSM"};
+      const gyms = {
+        "AR":{n:0,min:0,gross:0,km:0,carCost:0,dates:new Set()},
+        "MAX":{n:0,min:0,gross:0,km:0,carCost:0,dates:new Set()},
+        "TN":{n:0,min:0,gross:0,km:0,carCost:0,dates:new Set()},
+        "STSM":{n:0,min:0,gross:0,km:0,carCost:0,dates:new Set()}
+      };
+
+      // Fatturato, ore e lezioni realmente svolte.
+      (lessons || []).forEach(r=>{
+        const g = r.gym_code;
+        if(!gyms[g]) gyms[g]={n:0,min:0,gross:0,km:0,carCost:0,dates:new Set()};
+        gyms[g].n++;
+        gyms[g].min += Number(r.minutes || 0);
+        gyms[g].gross += Number(r.price || 0);
+        gyms[g].dates.add(r.lesson_date);
+      });
+
+      // Stima km: per ogni data attribuisce alla palestra la quota del percorso standard
+      // soltanto se in quella palestra risulta almeno una lezione svolta quel giorno.
+      Object.entries(gyms).forEach(([g,v])=>{
+        v.dates.forEach(dateStr=>{
+          const wd = new Date(dateStr + "T12:00:00").getDay();
+          const km = Number((gymTravelAllocationByWeekday[wd] || {})[g] || 0);
+          const rate = kmRateForDate(dateStr, history).rate ?? 0;
+          v.km += km;
+          v.carCost += km * rate;
+        });
+      });
+
+      const active = Object.entries(gyms).filter(([g,v])=>v.n>0);
+      const monthName = monthDate.toLocaleDateString("it-IT", {month:"long",year:"numeric"});
+      title.textContent = "Redditività per palestra · " + monthName;
+
+      if(active.length===0){
+        target.innerHTML = `<div class="gymrow"><span>Nessuna lezione svolta nel mese selezionato.</span></div>`;
+        return;
+      }
+
+      const bestGross = active.reduce((a,b)=>b[1].gross>a[1].gross?b:a);
+      const bestRate = active.reduce((a,b)=>{
+        const ar = a[1].min>0 ? a[1].gross/(a[1].min/60) : 0;
+        const br = b[1].min>0 ? b[1].gross/(b[1].min/60) : 0;
+        return br>ar?b:a;
+      });
+      const bestNet = active.reduce((a,b)=>(b[1].gross-b[1].carCost)>(a[1].gross-a[1].carCost)?b:a);
+
+      let total={n:0,min:0,gross:0,km:0,carCost:0};
+      active.forEach(([g,v])=>{
+        total.n+=v.n; total.min+=v.min; total.gross+=v.gross; total.km+=v.km; total.carCost+=v.carCost;
+      });
+
+      let html=`
+        <div class="profitHeader">
+          <div class="profitCard"><small>Maggior fatturato</small><strong>${names[bestGross[0]]} · ${formatEuro(bestGross[1].gross)}</strong></div>
+          <div class="profitCard"><small>Miglior €/ora</small><strong>${names[bestRate[0]]} · ${formatEuro(bestRate[1].gross/(bestRate[1].min/60))}/h</strong></div>
+          <div class="profitCard"><small>Miglior netto trasporti</small><strong>${names[bestNet[0]]} · ${formatEuro(bestNet[1].gross-bestNet[1].carCost)}</strong></div>
+        </div>`;
+
+      ["AR","MAX","TN","STSM"].forEach(g=>{
+        const v=gyms[g];
+        const hours=v.min/60;
+        const eurHour=hours>0 ? v.gross/hours : 0;
+        const net=v.gross-v.carCost;
+        html+=`
+          <div class="profitrow">
+            <div class="line1"><b>${names[g]}</b><span><b>${formatEuro(net)}</b> netto trasporti</span></div>
+            <div class="line2">
+              ${v.n} lez. · ${Math.floor(v.min/60)}h ${v.min%60}m · fatturato ${formatEuro(v.gross)} · ${formatEuro(eurHour)}/h<br>
+              ${v.km.toFixed(1)} km auto attribuiti · costo auto ${formatEuro(v.carCost)}
+            </div>
+          </div>`;
+      });
+
+      const totalHours=total.min/60;
+      html+=`
+        <div class="profitrow" style="border-top:2px solid #111827;margin-top:12px">
+          <div class="line1"><b>Totale palestre</b><span><b>${formatEuro(total.gross-total.carCost)}</b> netto trasporti</span></div>
+          <div class="line2">
+            ${total.n} lez. · ${Math.floor(total.min/60)}h ${total.min%60}m · fatturato ${formatEuro(total.gross)} · ${formatEuro(totalHours>0?total.gross/totalHours:0)}/h<br>
+            ${total.km.toFixed(1)} km auto attribuiti · costo auto ${formatEuro(total.carCost)}
+          </div>
+        </div>
+        <div class="profitNote">
+          I km per palestra sono una stima basata sulla quota del percorso standard attribuita a quella palestra nei giorni in cui risulta almeno una lezione svolta. Il lunedì A&R è considerata a piedi e quindi non genera costo auto. Finché non rendiamo i percorsi completamente dinamici, il totale km per palestra può differire leggermente dal totale della sezione “Redditività per giorno”.
+        </div>`;
+
+      target.innerHTML=html;
+    }catch(err){
+      console.error("Errore redditività per palestra:",err);
+      target.innerHTML=`<div class="gymrow"><span>Impossibile caricare la redditività per palestra.</span></div>`;
     }
   }
 
@@ -1355,6 +1499,7 @@ function renderDailySummary(){
     renderBusyDayChart();
     renderTravelChart();
     renderDailyProfitability();
+    renderGymProfitability();
  syncAccessUI();
 }
 
