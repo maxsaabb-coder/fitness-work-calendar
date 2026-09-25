@@ -1042,15 +1042,22 @@ totalEuro += v.euro;
       const monthName = monthDate.toLocaleDateString("it-IT", {month:"long",year:"numeric"});
       document.getElementById("profitTitle").textContent = "Redditività per giorno · " + monthName;
 
-      const editVisible = (!isReadOnly || (adminMode && Date.now() < adminUntil));
+      const canEditKm = (!isReadOnly || (adminMode && Date.now() < adminUntil));
+      const historyHtml = history.length
+        ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb">
+             <small><b>Storico costi:</b> ${history.map(r => `${formatDateIt(r.effective_from)} → ${formatEuro(r.cost_per_km)}/km`).join(" · ")}</small>
+           </div>`
+        : "";
       costBox.innerHTML = `
         <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
           <div>
             <b>Costo auto:</b> ${reference.rate !== null ? formatEuro(reference.rate)+"/km" : "non impostato"}
             ${reference.effective ? `<br><small>Valore in vigore dal ${formatDateIt(reference.effective)}. Ogni giornata usa il valore storico valido in quella data.</small>` : ""}
+            ${isReadOnly && !canEditKm ? `<br><small style="color:#92400e">Per modificarlo con l'account Max, attiva prima la modalità amministratore.</small>` : ""}
           </div>
-          <button id="kmCostEditBtn" onclick="editKmCost()" style="${editVisible ? "" : "display:none"}">Modifica €/km</button>
-        </div>`;
+          <button id="kmCostEditBtn" onclick="editKmCost()">Modifica costo €/km</button>
+        </div>
+        ${historyHtml}`;
 
       const byDate = {};
       (lessons || []).forEach(r => {
