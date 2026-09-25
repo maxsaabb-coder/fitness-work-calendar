@@ -463,6 +463,112 @@ const gymTravelAllocationByWeekday = {
   5:{"AR":2.4,"MAX":10.3,"TN":0.0,"STSM":0.0}
 };
 
+// Calcolo dinamico degli spostamenti in base alle lezioni realmente svolte.
+// Le distanze derivano dai percorsi reali impostati per Olga.
+function dynamicTravelForDate(dateStr, lessonRows){
+  const wd = new Date(dateStr + "T12:00:00").getDay();
+  const rows = lessonRows || [];
+  const gymKm = {AR:0, MAX:0, TN:0, STSM:0};
+  let km = 0;
+  let trips = 0;
+  let walk = 0;
+
+  const has = (gym, startBefore=null, startFrom=null) => rows.some(r => {
+    if(r.gym_code !== gym) return false;
+    const t = String(r.start_time || "").slice(0,5);
+    if(startBefore !== null && !(t < startBefore)) return false;
+    if(startFrom !== null && !(t >= startFrom)) return false;
+    return true;
+  });
+
+  const addCar = (distance, gym) => {
+    km += distance;
+    trips += 1;
+    if(gym && gymKm[gym] !== undefined) gymKm[gym] += distance;
+  };
+  const addWalk = distance => {
+    walk += distance;
+    trips += 1;
+  };
+
+  if(wd === 1){
+    const tnMorning = has("TN", "12:00", null);
+    const arMidday = has("AR", null, null);
+    const tnEvening = has("TN", null, "17:00");
+    if(tnMorning){ addCar(1.4,"TN"); addCar(1.4,"TN"); }
+    if(arMidday){ addWalk(0.8); addWalk(0.8); }
+    if(tnEvening){ addCar(1.4,"TN"); addCar(1.4,"TN"); }
+  }
+
+  if(wd === 2){
+    const ar = has("AR");
+    const max = has("MAX");
+    const tn = has("TN");
+    if(ar && max && tn){
+      addCar(0.8,"AR"); addCar(5.2,"MAX"); addCar(4.7,"TN"); addCar(1.4,"TN");
+    } else if(ar && max){
+      addCar(0.8,"AR"); addCar(5.2,"MAX"); addCar(5.1,"MAX");
+    } else if(max && tn){
+      addCar(5.1,"MAX"); addCar(4.7,"TN"); addCar(1.4,"TN");
+    } else if(ar && tn){
+      // Senza la tappa MAX c'è un intervallo ampio: rientro a casa prima di TN.
+      addCar(0.8,"AR"); addCar(0.8,"AR"); addCar(1.4,"TN"); addCar(1.4,"TN");
+    } else if(ar){
+      addCar(0.8,"AR"); addCar(0.8,"AR");
+    } else if(max){
+      addCar(5.1,"MAX"); addCar(5.1,"MAX");
+    } else if(tn){
+      addCar(1.4,"TN"); addCar(1.4,"TN");
+    }
+  }
+
+  if(wd === 3){
+    const ar = has("AR");
+    const stsm = has("STSM");
+    const tnEvening = has("TN", null, "17:00");
+    if(ar && stsm){
+      addCar(0.8,"AR"); addCar(8.1,"STSM"); addCar(6.4,"STSM");
+    } else if(ar){
+      addCar(0.8,"AR"); addCar(0.8,"AR");
+    } else if(stsm){
+      addCar(6.4,"STSM"); addCar(6.4,"STSM");
+    }
+    if(tnEvening){ addCar(1.4,"TN"); addCar(1.4,"TN"); }
+  }
+
+  if(wd === 4){
+    const ar = has("AR", "12:00", null);
+    const max = has("MAX", "12:00", null);
+    const tnAfternoon = has("TN", "17:00", "12:00");
+    const tnEvening = has("TN", null, "17:00");
+    if(ar && max){
+      addCar(0.8,"AR"); addCar(5.2,"MAX"); addCar(5.1,"MAX");
+    } else if(ar){
+      addCar(0.8,"AR"); addCar(0.8,"AR");
+    } else if(max){
+      addCar(5.1,"MAX"); addCar(5.1,"MAX");
+    }
+    if(tnAfternoon){ addCar(1.4,"TN"); addCar(1.4,"TN"); }
+    if(tnEvening){ addCar(1.4,"TN"); addCar(1.4,"TN"); }
+  }
+
+  if(wd === 5){
+    const arMorning = has("AR", "12:00", null);
+    const maxMorning = has("MAX", "12:00", null);
+    const arAfternoon = has("AR", null, "12:00");
+    if(arMorning && maxMorning){
+      addCar(0.8,"AR"); addCar(5.2,"MAX"); addCar(5.1,"MAX");
+    } else if(arMorning){
+      addCar(0.8,"AR"); addCar(0.8,"AR");
+    } else if(maxMorning){
+      addCar(5.1,"MAX"); addCar(5.1,"MAX");
+    }
+    if(arAfternoon){ addCar(0.8,"AR"); addCar(0.8,"AR"); }
+  }
+
+  return {km, trips, walk, gymKm};
+}
+
 function getMonday(d){
  let x=new Date(d);
  let day=x.getDay();
@@ -1023,7 +1129,7 @@ totalEuro += v.euro;
       const [{data: lessons, error: lessonError}, {data: costs, error: costError}] = await Promise.all([
         supabaseClient
           .from("lessons")
-          .select("lesson_date,minutes,price,status")
+          .select("lesson_date,start_time,gym_code,minutes,price,status")
           .gte("lesson_date", start)
           .lte("lesson_date", end)
           .eq("status", "done"),
@@ -1061,10 +1167,11 @@ totalEuro += v.euro;
 
       const byDate = {};
       (lessons || []).forEach(r => {
-        if(!byDate[r.lesson_date]) byDate[r.lesson_date] = {n:0,min:0,gross:0};
+        if(!byDate[r.lesson_date]) byDate[r.lesson_date] = {n:0,min:0,gross:0,rows:[]};
         byDate[r.lesson_date].n++;
         byDate[r.lesson_date].min += Number(r.minutes || 0);
         byDate[r.lesson_date].gross += Number(r.price || 0);
+        byDate[r.lesson_date].rows.push(r);
       });
 
       const days = {};
@@ -1075,7 +1182,7 @@ totalEuro += v.euro;
       Object.entries(byDate).forEach(([dateStr,v]) => {
         const wd = new Date(dateStr + "T12:00:00").getDay();
         if(wd < 1 || wd > 5) return;
-        const travel = standardTravelByWeekday[wd];
+        const travel = dynamicTravelForDate(dateStr, v.rows);
         const rateInfo = kmRateForDate(dateStr, history);
         const rate = rateInfo.rate ?? 0;
         const d = days[wd];
@@ -1136,7 +1243,7 @@ totalEuro += v.euro;
           </div>
         </div>
         <div class="profitNote">
-          Stima trasporti basata sul percorso standard del giorno quando risulta almeno una lezione svolta. Il “netto trasporti” sottrae solo il costo auto: non comprende imposte, contributi o altri costi. Nel prossimo passaggio possiamo rendere i km dinamici in base alle singole lezioni effettivamente svolte.
+          Km dinamici calcolati sulle lezioni realmente svolte e sui percorsi abituali di Olga. Se una tappa o un intero blocco di lezioni non viene svolto, i relativi spostamenti non vengono conteggiati. Il “netto trasporti” sottrae solo il costo auto: non comprende imposte, contributi o altri costi.
         </div>`;
 
       target.innerHTML = html;
@@ -1167,7 +1274,7 @@ totalEuro += v.euro;
       const [{data: lessons, error: lessonError}, {data: costs, error: costError}] = await Promise.all([
         supabaseClient
           .from("lessons")
-          .select("lesson_date,gym_code,minutes,price,status")
+          .select("lesson_date,start_time,gym_code,minutes,price,status")
           .gte("lesson_date", start)
           .lte("lesson_date", end)
           .eq("status", "done"),
@@ -1200,15 +1307,20 @@ totalEuro += v.euro;
         gyms[g].dates.add(r.lesson_date);
       });
 
-      // Stima km: per ogni data attribuisce alla palestra la quota del percorso standard
-      // soltanto se in quella palestra risulta almeno una lezione svolta quel giorno.
-      Object.entries(gyms).forEach(([g,v])=>{
-        v.dates.forEach(dateStr=>{
-          const wd = new Date(dateStr + "T12:00:00").getDay();
-          const km = Number((gymTravelAllocationByWeekday[wd] || {})[g] || 0);
-          const rate = kmRateForDate(dateStr, history).rate ?? 0;
-          v.km += km;
-          v.carCost += km * rate;
+      // Km dinamici: ricostruisce il percorso di ogni giornata in base alle sole lezioni svolte
+      // e attribuisce ogni segmento alla palestra che lo ha generato.
+      const lessonsByDate = {};
+      (lessons || []).forEach(r=>{
+        if(!lessonsByDate[r.lesson_date]) lessonsByDate[r.lesson_date]=[];
+        lessonsByDate[r.lesson_date].push(r);
+      });
+      Object.entries(lessonsByDate).forEach(([dateStr, rows])=>{
+        const travel = dynamicTravelForDate(dateStr, rows);
+        const rate = kmRateForDate(dateStr, history).rate ?? 0;
+        Object.entries(travel.gymKm).forEach(([g,km])=>{
+          if(!gyms[g]) return;
+          gyms[g].km += km;
+          gyms[g].carCost += km * rate;
         });
       });
 
@@ -1266,7 +1378,7 @@ totalEuro += v.euro;
           </div>
         </div>
         <div class="profitNote">
-          I km per palestra sono una stima basata sulla quota del percorso standard attribuita a quella palestra nei giorni in cui risulta almeno una lezione svolta. Il lunedì A&R è considerata a piedi e quindi non genera costo auto. Finché non rendiamo i percorsi completamente dinamici, il totale km per palestra può differire leggermente dal totale della sezione “Redditività per giorno”.
+          I km per palestra sono calcolati dinamicamente dalle lezioni realmente svolte e dagli spostamenti abituali di Olga. Il lunedì A&R resta considerata a piedi e quindi non genera costo auto. La somma dei km attribuiti alle palestre coincide con i km auto usati nella redditività per giorno.
         </div>`;
 
       target.innerHTML=html;
