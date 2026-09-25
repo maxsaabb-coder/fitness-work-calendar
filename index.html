@@ -1375,7 +1375,7 @@ totalEuro += v.euro;
   }
 
   function safeJsText(v){
-    return String(v ?? "").replace(/\/g,"\\").replace(/'/g,"\'").replace(/\n/g," ");
+    return String(v ?? "").replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/\n/g," ");
   }
 
   function showChartDetail(title,label,value,detail=""){
