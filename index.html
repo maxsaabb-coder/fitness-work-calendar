@@ -188,6 +188,44 @@ main{
   font-size:14px
 }
 
+.profitHeader{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin:12px 0
+}
+.profitCard{
+  background:white;
+  border-radius:12px;
+  padding:12px;
+  box-shadow:0 1px 3px #0001
+}
+.profitCard small{display:block;color:#6b7280;margin-bottom:4px}
+.profitCard strong{font-size:17px}
+.profitrow{
+  background:white;
+  padding:12px;
+  border-radius:10px;
+  margin:7px 0
+}
+.profitrow .line1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.profitrow .line2{margin-top:5px;color:#6b7280;font-size:13px;line-height:1.45}
+.kmSettings{
+  background:#f9fafb;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  padding:12px;
+  margin:10px 0 14px
+}
+.kmSettings button{
+  border:0;
+  border-radius:9px;
+  padding:8px 11px;
+  font-weight:700;
+  cursor:pointer
+}
+.profitNote{font-size:12px;color:#6b7280;line-height:1.45;margin-top:10px}
+
 footer{
   text-align:center;
   color:#6b7280;
@@ -315,6 +353,12 @@ footer{
   <h3 style="text-align:center">Spostamenti e chilometri</h3>
   <div id="travelChart"></div>
 </div>
+
+<div class="gymTotals" style="margin-top:24px">
+  <h3 id="profitTitle" style="text-align:center">Redditività per giorno</h3>
+  <div id="kmCostBox" class="kmSettings"></div>
+  <div id="dailyProfitability"></div>
+</div>
 </div>
 </div>
 </div>
@@ -395,6 +439,14 @@ let currentWeek=getMonday(new Date());
   let summaryMonth = new Date();
   let summaryYear = new Date().getFullYear();
 let selected=null;
+
+const standardTravelByWeekday = {
+  1:{name:"Lunedì",km:5.6,trips:6,walk:1.6},
+  2:{name:"Martedì",km:12.1,trips:4,walk:0},
+  3:{name:"Mercoledì",km:18.1,trips:5,walk:0},
+  4:{name:"Giovedì",km:16.7,trips:7,walk:0},
+  5:{name:"Venerdì",km:12.7,trips:5,walk:0}
+};
 
 function getMonday(d){
  let x=new Date(d);
@@ -585,6 +637,7 @@ function renderDays(){
     const adminBtn = document.getElementById("adminToggleBtn");
     const badge = document.getElementById("adminBadge");
     const allDoneBtn = document.getElementById("allDoneBtn");
+    const kmCostEditBtn = document.getElementById("kmCostEditBtn");
 
     const maxAccount = isReadOnly;
     const active = maxAccount && adminMode && Date.now() < adminUntil;
@@ -601,6 +654,7 @@ function renderDays(){
 
     if (badge) badge.style.display = active ? "block" : "none";
     if (allDoneBtn) allDoneBtn.style.display = (maxAccount && !active) ? "none" : "";
+    if (kmCostEditBtn) kmCostEditBtn.style.display = (maxAccount && !active) ? "none" : "";
   }
 
   function formatAdminLockTime(value){
@@ -791,6 +845,7 @@ function renderSummary(){
 function changeMonth(delta){
   summaryMonth.setMonth(summaryMonth.getMonth() + delta);
   renderMonthlySummary();
+  renderDailyProfitability();
 }
   function changeYear(delta){
   summaryYear += delta;
@@ -876,6 +931,200 @@ totalEuro += v.euro;
       "<div>Impossibile caricare il riepilogo mensile.</div>";
   }
 }
+  function formatEuro(value){
+    return "€" + Number(value || 0).toFixed(2).replace(".",",");
+  }
+
+  function formatDateIt(dateStr){
+    const d = new Date(dateStr + "T12:00:00");
+    return d.toLocaleDateString("it-IT", {day:"2-digit", month:"2-digit", year:"numeric"});
+  }
+
+  function kmRateForDate(dateStr, history){
+    let rate = null;
+    let effective = null;
+    (history || []).forEach(row => {
+      if(row.effective_from <= dateStr){
+        rate = Number(row.cost_per_km);
+        effective = row.effective_from;
+      }
+    });
+    return {rate, effective};
+  }
+
+  async function editKmCost(){
+    const canEdit = !isReadOnly || (adminMode && Date.now() < adminUntil);
+    if(!canEdit){
+      alert("Per modificare il costo chilometrico attiva prima la modalità amministratore.");
+      return;
+    }
+
+    const defaultDate = iso(new Date());
+    const effectiveFrom = prompt("Da quale data deve valere il nuovo costo? (AAAA-MM-GG)", defaultDate);
+    if(effectiveFrom === null) return;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)){
+      alert("Inserisci la data nel formato AAAA-MM-GG.");
+      return;
+    }
+
+    const raw = prompt("Nuovo costo auto per km in euro (es. 0,30)", "0,30");
+    if(raw === null) return;
+    const value = Number(raw.replace(",","."));
+    if(!Number.isFinite(value) || value <= 0 || value >= 5){
+      alert("Inserisci un costo valido, per esempio 0,30.");
+      return;
+    }
+
+    const { error } = await supabaseClient
+      .from("km_cost_history")
+      .upsert([{effective_from: effectiveFrom, cost_per_km: value}], {onConflict:"effective_from"});
+
+    if(error){
+      console.error("Errore costo chilometrico:", error);
+      alert("Non sono riuscito a salvare il nuovo costo chilometrico.");
+      return;
+    }
+
+    await renderDailyProfitability();
+    alert("Costo chilometrico aggiornato dal " + formatDateIt(effectiveFrom) + ".");
+  }
+
+  async function renderDailyProfitability(){
+    const target = document.getElementById("dailyProfitability");
+    const costBox = document.getElementById("kmCostBox");
+    if(!target || !costBox) return;
+
+    try{
+      const monthDate = new Date(summaryMonth);
+      const y = monthDate.getFullYear();
+      const m = monthDate.getMonth();
+      const first = new Date(y,m,1);
+      const last = new Date(y,m+1,0);
+      const start = iso(first);
+      const end = iso(last);
+
+      const [{data: lessons, error: lessonError}, {data: costs, error: costError}] = await Promise.all([
+        supabaseClient
+          .from("lessons")
+          .select("lesson_date,minutes,price,status")
+          .gte("lesson_date", start)
+          .lte("lesson_date", end)
+          .eq("status", "done"),
+        supabaseClient
+          .from("km_cost_history")
+          .select("effective_from,cost_per_km")
+          .lte("effective_from", end)
+          .order("effective_from", {ascending:true})
+      ]);
+
+      if(lessonError) throw lessonError;
+      if(costError) throw costError;
+
+      const history = costs || [];
+      const reference = kmRateForDate(end, history);
+      const monthName = monthDate.toLocaleDateString("it-IT", {month:"long",year:"numeric"});
+      document.getElementById("profitTitle").textContent = "Redditività per giorno · " + monthName;
+
+      const editVisible = (!isReadOnly || (adminMode && Date.now() < adminUntil));
+      costBox.innerHTML = `
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+          <div>
+            <b>Costo auto:</b> ${reference.rate !== null ? formatEuro(reference.rate)+"/km" : "non impostato"}
+            ${reference.effective ? `<br><small>Valore in vigore dal ${formatDateIt(reference.effective)}. Ogni giornata usa il valore storico valido in quella data.</small>` : ""}
+          </div>
+          <button id="kmCostEditBtn" onclick="editKmCost()" style="${editVisible ? "" : "display:none"}">Modifica €/km</button>
+        </div>`;
+
+      const byDate = {};
+      (lessons || []).forEach(r => {
+        if(!byDate[r.lesson_date]) byDate[r.lesson_date] = {n:0,min:0,gross:0};
+        byDate[r.lesson_date].n++;
+        byDate[r.lesson_date].min += Number(r.minutes || 0);
+        byDate[r.lesson_date].gross += Number(r.price || 0);
+      });
+
+      const days = {};
+      for(let wd=1; wd<=5; wd++){
+        days[wd] = {name:standardTravelByWeekday[wd].name,n:0,min:0,gross:0,km:0,trips:0,carCost:0,workedDates:0};
+      }
+
+      Object.entries(byDate).forEach(([dateStr,v]) => {
+        const wd = new Date(dateStr + "T12:00:00").getDay();
+        if(wd < 1 || wd > 5) return;
+        const travel = standardTravelByWeekday[wd];
+        const rateInfo = kmRateForDate(dateStr, history);
+        const rate = rateInfo.rate ?? 0;
+        const d = days[wd];
+        d.n += v.n;
+        d.min += v.min;
+        d.gross += v.gross;
+        d.km += travel.km;
+        d.trips += travel.trips;
+        d.carCost += travel.km * rate;
+        d.workedDates++;
+      });
+
+      const active = Object.values(days).filter(d=>d.n>0);
+      if(active.length===0){
+        target.innerHTML = `<div class="gymrow"><span>Nessuna lezione svolta nel mese selezionato.</span></div>`;
+        return;
+      }
+
+      const bestGross = active.reduce((a,b)=>b.gross>a.gross?b:a);
+      const bestNet = active.reduce((a,b)=>(b.gross-b.carCost)>(a.gross-a.carCost)?b:a);
+
+      let total = {n:0,min:0,gross:0,km:0,trips:0,carCost:0};
+      active.forEach(d=>{
+        total.n+=d.n; total.min+=d.min; total.gross+=d.gross; total.km+=d.km; total.trips+=d.trips; total.carCost+=d.carCost;
+      });
+
+      let html = `
+        <div class="profitHeader">
+          <div class="profitCard"><small>Maggior fatturato</small><strong>${bestGross.name} · ${formatEuro(bestGross.gross)}</strong></div>
+          <div class="profitCard"><small>Miglior netto trasporti</small><strong>${bestNet.name} · ${formatEuro(bestNet.gross-bestNet.carCost)}</strong></div>
+        </div>`;
+
+      for(let wd=1; wd<=5; wd++){
+        const d=days[wd];
+        const hours=d.min/60;
+        const euroHour=hours>0 ? d.gross/hours : 0;
+        const net=d.gross-d.carCost;
+        html += `
+          <div class="profitrow">
+            <div class="line1">
+              <b>${d.name}</b>
+              <span><b>${formatEuro(net)}</b> netto trasporti</span>
+            </div>
+            <div class="line2">
+              ${d.n} lez. · ${Math.floor(d.min/60)}h ${d.min%60}m · fatturato ${formatEuro(d.gross)} · ${formatEuro(euroHour)}/h<br>
+              ${d.km.toFixed(1)} km auto · ${d.trips} spost. · costo auto ${formatEuro(d.carCost)}
+            </div>
+          </div>`;
+      }
+
+      const totalHours = total.min/60;
+      html += `
+        <div class="profitrow" style="border-top:2px solid #111827;margin-top:12px">
+          <div class="line1"><b>Totale mese</b><span><b>${formatEuro(total.gross-total.carCost)}</b> netto trasporti</span></div>
+          <div class="line2">
+            ${total.n} lez. · ${Math.floor(total.min/60)}h ${total.min%60}m · fatturato ${formatEuro(total.gross)} · ${formatEuro(totalHours>0?total.gross/totalHours:0)}/h<br>
+            ${total.km.toFixed(1)} km auto · costo auto ${formatEuro(total.carCost)}
+          </div>
+        </div>
+        <div class="profitNote">
+          Stima trasporti basata sul percorso standard del giorno quando risulta almeno una lezione svolta. Il “netto trasporti” sottrae solo il costo auto: non comprende imposte, contributi o altri costi. Nel prossimo passaggio possiamo rendere i km dinamici in base alle singole lezioni effettivamente svolte.
+        </div>`;
+
+      target.innerHTML = html;
+      syncAccessUI();
+
+    }catch(err){
+      console.error("Errore redditività giornaliera:",err);
+      costBox.innerHTML = "";
+      target.innerHTML = `<div class="gymrow"><span>Impossibile caricare la redditività giornaliera.</span></div>`;
+    }
+  }
+
   async function renderYearlySummary(){
   try{
     const start = summaryYear + "-01-01";
@@ -1003,13 +1252,7 @@ if(d.min===0){
     document.getElementById("busyDayChart").innerHTML = html;
 }
   function renderTravelChart(){
-  const travel = [
-    {name:"Lunedì", trips:6, km:5.6, walk:1.6},
-    {name:"Martedì", trips:4, km:12.1, walk:0},
-    {name:"Mercoledì", trips:5, km:18.1, walk:0},
-    {name:"Giovedì", trips:7, km:16.7, walk:0},
-    {name:"Venerdì", trips:5, km:12.7, walk:0}
-  ];
+  const travel = [1,2,3,4,5].map(wd=>standardTravelByWeekday[wd]);
 
   const totalKm = travel.reduce((s,d)=>s+d.km,0);
   const totalWalk = travel.reduce((s,d)=>s+d.walk,0);
@@ -1111,6 +1354,7 @@ function renderDailySummary(){
   renderYearlySummary();
     renderBusyDayChart();
     renderTravelChart();
+    renderDailyProfitability();
  syncAccessUI();
 }
 
