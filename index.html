@@ -274,6 +274,7 @@ main{
   padding:14px;
   min-width:0
 }
+.chartBox.wide{grid-column:1 / -1}
 .chartBox h4{margin:0 0 3px;font-size:16px}
 .chartSub{color:#6b7280;font-size:12px;margin-bottom:12px}
 .vBars{display:flex;align-items:flex-end;gap:10px;height:190px;padding:18px 6px 0;border-bottom:1px solid #d1d5db}
@@ -1383,7 +1384,7 @@ totalEuro += v.euro;
     alert(lines.join("\n"));
   }
 
-  function verticalBars(items, formatter, title="Dettaglio grafico"){
+  function verticalBars(items, formatter, title="Dettaglio grafico", bestTag="Migliore"){
     const max = Math.max(...items.map(x=>x.value), 0);
     const bestIndex = items.length ? items.reduce((best,x,i,a)=>x.value>a[best].value?i:best,0) : -1;
     return `<div class="vBars">${items.map((x,i)=>{
@@ -1391,7 +1392,7 @@ totalEuro += v.euro;
       const valueText=formatter(x.value);
       const detail=safeJsText(x.detail || "");
       return `<div class="vBarItem" title="Tocca per il dettaglio" onclick="showChartDetail('${safeJsText(title)}','${safeJsText(x.label)}','${safeJsText(valueText)}','${detail}')">
-        ${i===bestIndex && x.value>0 ? '<div class="vBarBestTag">Migliore</div>' : ''}
+        ${i===bestIndex && x.value>0 && bestTag ? `<div class="vBarBestTag">${bestTag}</div>` : ''}
         <div class="vBarValue">${valueText}</div>
         <div class="vBar ${i===bestIndex && x.value>0 ? 'best' : ''}" style="height:${pct}%;background:${x.color || chartColor(i)}"></div>
         <div class="vBarLabel">${x.label}</div>
@@ -1510,6 +1511,7 @@ totalEuro += v.euro;
       const grossGym=gymOrder.map(g=>({label:gymNames[g],value:gyms[g].gross,color:gymColors[g],detail:`${Math.round(gyms[g].min/60)}h ${gyms[g].min%60}m svolte · ${gyms[g].km.toFixed(1)} km attribuiti`}));
       const hourlyGym=gymOrder.map(g=>({label:gymNames[g],value:gyms[g].min>0?gyms[g].gross/(gyms[g].min/60):0,color:gymColors[g],detail:`Fatturato ${formatEuro(gyms[g].gross)} · ${Math.floor(gyms[g].min/60)}h ${gyms[g].min%60}m`}));
       const netDays=[1,2,3,4,5].map(wd=>({label:weekdayNames[wd],value:days[wd].gross-days[wd].cost,color:"#2563eb",detail:`Fatturato ${formatEuro(days[wd].gross)} · costo auto ${formatEuro(days[wd].cost)} · ${days[wd].km.toFixed(1)} km`}));
+      const transportCostDays=[1,2,3,4,5].map(wd=>({label:weekdayNames[wd],value:days[wd].cost,color:"#dc2626",detail:`${days[wd].km.toFixed(1)} km auto · netto trasporti ${formatEuro(days[wd].gross-days[wd].cost)} · fatturato ${formatEuro(days[wd].gross)}`}));
 
       target.innerHTML=`
         <div class="econCards">
@@ -1539,8 +1541,13 @@ totalEuro += v.euro;
             <div class="chartSub">Media oraria sulle sole lezioni svolte.</div>
             ${verticalBars(hourlyGym,v=>formatEuro(v)+"/h","€/ora per palestra")}
           </div>
+          <div class="chartBox wide">
+            <h4>Costo trasporti per giorno</h4>
+            <div class="chartSub">Solo costo auto giornaliero, per capire in quali giorni spendi di più per gli spostamenti.</div>
+            ${verticalBars(transportCostDays,formatEuro,"Costo trasporti per giorno","Costo più alto")}
+          </div>
         </div>
-        <div class="chartNote">I grafici usano i dati del mese selezionato e le lezioni effettivamente svolte. La barra migliore di ogni confronto è evidenziata: tocca una barra o una voce della legenda per vedere il dettaglio. Il “netto trasporti” sottrae solo il costo auto e non comprende imposte, contributi o altri costi.</div>`;
+        <div class="chartNote">I grafici usano i dati del mese selezionato e le lezioni effettivamente svolte. La barra evidenziata mostra il valore più alto del confronto: tocca una barra o una voce della legenda per vedere il dettaglio. Il “netto trasporti” sottrae solo il costo auto e non comprende imposte, contributi o altri costi.</div>`;
     }catch(err){
       console.error("Errore grafici economici:",err);
       target.innerHTML=`<div class="gymrow"><span>Impossibile caricare i grafici economici.</span></div>`;
