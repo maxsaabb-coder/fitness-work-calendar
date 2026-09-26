@@ -1435,7 +1435,7 @@ totalEuro += v.euro;
       const rows=lessons || [];
       const history=costs || [];
       const monthName=monthDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
-      title.textContent="Grafici economici · " + monthName;
+      title.textContent="Grafici economici mensili · " + monthName;
 
       const gymNames={"AR":"A&R","MAX":"MAX","TN":"TN","STSM":"STSM"};
       const gymColors={"AR":"#2563eb","MAX":"#16a34a","TN":"#f97316","STSM":"#7c3aed"};
@@ -1490,40 +1490,41 @@ totalEuro += v.euro;
       const transportCostDays=[1,2,3,4,5].map(wd=>({label:weekdayNames[wd],value:days[wd].cost,color:"#dc2626"}));
 
       target.innerHTML=`
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:13px;color:#1e3a8a"><strong>Periodo analizzato:</strong> ${monthName}. Tutti i valori e tutti i grafici qui sotto sono calcolati sull'intero mese selezionato.</div>
         <div class="econCards">
-          <div class="econCard"><small>Fatturato mese</small><strong>${formatEuro(totalGross)}</strong><span>${rows.length} lezioni · ${Math.floor(totalMin/60)}h ${totalMin%60}m</span></div>
-          <div class="econCard"><small>Costo auto</small><strong>${formatEuro(totalCost)}</strong><span>${totalKm.toFixed(1)} km auto</span></div>
-          <div class="econCard"><small>Netto trasporti</small><strong>${formatEuro(totalNet)}</strong><span>fatturato meno costo auto</span></div>
-          <div class="econCard"><small>€/ora medio</small><strong>${formatEuro(avgHour)}/h</strong><span>su ore effettivamente svolte</span></div>
+          <div class="econCard"><small>Fatturato del mese</small><strong>${formatEuro(totalGross)}</strong><span>${rows.length} lezioni · ${Math.floor(totalMin/60)}h ${totalMin%60}m</span></div>
+          <div class="econCard"><small>Costo auto del mese</small><strong>${formatEuro(totalCost)}</strong><span>${totalKm.toFixed(1)} km auto</span></div>
+          <div class="econCard"><small>Netto trasporti del mese</small><strong>${formatEuro(totalNet)}</strong><span>fatturato meno costo auto</span></div>
+          <div class="econCard"><small>€/ora medio del mese</small><strong>${formatEuro(avgHour)}/h</strong><span>su ore effettivamente svolte</span></div>
         </div>
         <div class="chartGrid">
           <div class="chartBox">
-            <h4>Fatturato per palestra</h4>
+            <h4>Fatturato mensile per palestra</h4>
             <div class="chartSub">Confronto del fatturato totale nel mese.</div>
             ${verticalBars(grossGym,formatEuro)}
           </div>
           <div class="chartBox">
-            <h4>Netto trasporti per giorno</h4>
-            <div class="chartSub">Fatturato meno costo auto, raggruppato per giorno della settimana.</div>
+            <h4>Netto trasporti mensile per giorno</h4>
+            <div class="chartSub">Totale del mese selezionato, raggruppato per giorno della settimana: somma di tutti i lunedì, martedì, ecc.</div>
             ${verticalBars(netDays,formatEuro)}
           </div>
           <div class="chartBox">
-            <h4>Ripartizione fatturato</h4>
+            <h4>Ripartizione del fatturato mensile</h4>
             <div class="chartSub">Quota percentuale del fatturato per palestra.</div>
             ${donutChart(grossGym,totalGross)}
           </div>
           <div class="chartBox">
-            <h4>€/ora per palestra</h4>
+            <h4>€/ora medio mensile per palestra</h4>
             <div class="chartSub">Media oraria sulle sole lezioni svolte.</div>
             ${verticalBars(hourlyGym,v=>formatEuro(v)+"/h")}
           </div>
           <div class="chartBox wide">
-            <h4>Costo trasporti per giorno</h4>
-            <div class="chartSub">Costo auto raggruppato per giorno della settimana, per vedere subito quando gli spostamenti incidono di più.</div>
+            <h4>Costo trasporti mensile per giorno</h4>
+            <div class="chartSub">Costo auto totale del mese selezionato, raggruppato per giorno della settimana: somma di tutti i lunedì, martedì, ecc.</div>
             ${verticalBars(transportCostDays,formatEuro)}
           </div>
         </div>
-        <div class="chartNote">I grafici usano i dati del mese selezionato e le lezioni effettivamente svolte. Il “netto trasporti” sottrae solo il costo auto e non comprende imposte, contributi o altri costi.</div>`;
+        <div class="chartNote">Tutti i grafici di questa scheda si riferiscono al mese selezionato. Nei grafici per giorno, ogni barra è la somma mensile di tutti i lunedì, martedì, ecc. Il “netto trasporti” sottrae solo il costo auto e non comprende imposte, contributi o altri costi.</div>`;
     }catch(err){
       console.error("Errore grafici economici:",err);
       target.innerHTML=`<div class="gymrow"><span>Impossibile caricare i grafici economici.</span></div>`;
