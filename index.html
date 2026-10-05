@@ -320,6 +320,11 @@ main{
 .historyAudit button{margin-top:6px;border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:6px 9px;font-weight:700;cursor:pointer}
 .lessonNoteAudit{margin-top:8px;padding:8px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:12px;color:#374151}
 .lessonNoteAudit+.lessonNoteAudit{margin-top:6px}
+.lessonNoteHead{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.noteDeleteBtn{border:0;background:transparent;color:#b91c1c;font-size:20px;line-height:1;padding:0 2px;cursor:pointer;font-weight:700}
+.noteDeleteBtn:hover{color:#7f1d1d}
+.historyNoteRow{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.historyNoteRow .historyMeta{margin:0}
 .lessonNoteMeta{font-weight:700;color:#6b7280;margin-bottom:2px}
 .lessonNoteText{white-space:pre-wrap}
 .auditList{display:grid;gap:10px;margin-top:10px;max-height:55vh;overflow:auto}
@@ -1077,14 +1082,35 @@ function statusToDb(s){
 }
 
 function renderLessonNotes(lessonKey,currentNote){
+ if(!currentNote) return "";
+
  const entries=weekNoteAuditMap.get(lessonKey)||[];
- if(entries.length){
-   return entries.map(e=>`<div class="lessonNoteAudit"><div class="lessonNoteMeta">Nota · ${formatAuditDate(e.changed_at)} · ${actorLabel(e.changed_by_email)}</div><div class="lessonNoteText">${escapeHtml(e.text)}</div></div>`).join("");
+ let meta=null;
+
+ // Usa l'ultima modifica che corrisponde alla nota attualmente salvata.
+ for(let i=entries.length-1;i>=0;i--){
+   if(String(entries[i].text||"")===String(currentNote||"")){
+     meta=entries[i];
+     break;
+   }
  }
- if(currentNote){
-   return `<div class="lessonNoteAudit"><div class="lessonNoteMeta">Nota</div><div class="lessonNoteText">${escapeHtml(currentNote)}</div></div>`;
- }
- return "";
+
+ const editable=canEditLessons();
+ const deleteBtn=editable
+   ? `<button class="noteDeleteBtn" title="Cancella nota" aria-label="Cancella nota" onclick="deleteLessonNoteByKey('${encodeURIComponent(lessonKey)}')">×</button>`
+   : "";
+
+ const metaText=meta
+   ? `Nota · ${formatAuditDate(meta.changed_at)} · ${actorLabel(meta.changed_by_email)}`
+   : "Nota";
+
+ return `<div class="lessonNoteAudit">
+   <div class="lessonNoteHead">
+     <div class="lessonNoteMeta">${metaText}</div>
+     ${deleteBtn}
+   </div>
+   <div class="lessonNoteText">${escapeHtml(currentNote)}</div>
+ </div>`;
 }
 
 function renderLessons(){
@@ -2144,7 +2170,12 @@ function renderDailySummary(){
         const gym=r._gymDisplay || (r.gym_code==="AR"?"A&R":r.gym_code);
         const status=statusFromDb(r.status);
         const sub=r.substituted_by?` · ${r.substituted_by}`:"";
-        const note=r.note?`<div class="historyMeta">Nota: ${escapeHtml(r.note)}</div>`:"";
+        const note=r.note
+          ? `<div class="historyNoteRow">
+               <div class="historyMeta">Nota: ${escapeHtml(r.note)}</div>
+               ${editable && r.id ? `<button class="noteDeleteBtn" title="Cancella nota" aria-label="Cancella nota" onclick="deleteHistoryNoteById('${r.id}')">×</button>` : ""}
+             </div>`
+          : "";
         const reminder=r.status==="pending"?'<div class="historyMeta" style="color:#b45309;font-weight:700">⚠ Da verificare: lezione conclusa da almeno 30 min</div>':"";
         const changes=r.id ? (auditByLesson.get(r.id) || []) : [];
         const latestChange=changes[0] || null;
@@ -2378,6 +2409,72 @@ async function saveNote(){
    await loadWeekFromSupabase();
    await renderLessonHistory();
    render();
+ }
+}
+
+async function deleteLessonNoteByKey(encodedKey){
+ if(!canEditLessons()){
+   alert("Non hai i permessi per cancellare questa nota.");
+   return;
+ }
+
+ const key=decodeURIComponent(encodedKey);
+ const d=getData(key);
+
+ if(!String(d.note||"").trim()){
+   alert("Questa lezione non ha una nota da cancellare.");
+   return;
+ }
+
+ const okConfirm=confirm("Vuoi davvero cancellare questa nota?\n\nLa cancellazione resterà registrata nello storico modifiche.");
+ if(!okConfirm) return;
+
+ d.note="";
+ const ok=await setData(key,d);
+
+ if(ok){
+   await loadWeekFromSupabase();
+   await renderLessonHistory();
+   render();
+ }
+}
+
+async function deleteHistoryNoteById(lessonId){
+ if(!canEditLessons()){
+   alert("Non hai i permessi per cancellare questa nota.");
+   return;
+ }
+
+ const okConfirm=confirm("Vuoi davvero cancellare questa nota?\n\nLa cancellazione resterà registrata nello storico modifiche.");
+ if(!okConfirm) return;
+
+ try{
+   const {data:row,error:readError}=await supabaseClient
+     .from("lessons")
+     .select("id,note")
+     .eq("id",lessonId)
+     .single();
+
+   if(readError) throw readError;
+
+   if(!String(row?.note||"").trim()){
+     alert("Questa lezione non ha una nota da cancellare.");
+     return;
+   }
+
+   const {error:updateError}=await supabaseClient
+     .from("lessons")
+     .update({note:null,modified_at:new Date().toISOString()})
+     .eq("id",lessonId);
+
+   if(updateError) throw updateError;
+
+   await loadWeekFromSupabase();
+   await renderLessonHistory();
+   render();
+ }catch(err){
+   console.error("Errore cancellazione nota:",err);
+   alert("Non è stato possibile cancellare la nota.");
  }
 }
 
