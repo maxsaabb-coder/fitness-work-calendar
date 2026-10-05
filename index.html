@@ -1971,9 +1971,9 @@ function renderDailySummary(){
         dbByKey.set(key,{...r,_gymDisplay:gym});
       });
 
-      // Costruisce lo storico operativo: include soltanto lezioni il cui orario è già trascorso.
-      // Se una lezione prevista non ha ancora una riga in Supabase, viene mostrata come "Da confermare"
-      // così funziona anche da promemoria per eventuali ore dimenticate.
+      // Costruisce lo storico operativo: una lezione entra nello storico soltanto
+      // 30 minuti dopo il suo orario di fine. Se non ha ancora una riga in Supabase,
+      // viene mostrata come "Da confermare" così funziona da promemoria per eventuali ore dimenticate.
       const now=new Date();
       const merged=[];
       const cursor=new Date(firstDay);
@@ -1987,8 +1987,9 @@ function renderDailySummary(){
             const endParts=String(r[2]).split(":").map(Number);
             const lessonEnd=new Date(cursor);
             lessonEnd.setHours(endParts[0]||0,endParts[1]||0,0,0);
+            const historyThreshold=new Date(lessonEnd.getTime() + 30*60*1000);
 
-            if(lessonEnd<=now){
+            if(historyThreshold<=now){
               const key=`${dayIso}_${r[1]}_${r[3]}_${r[4]}`;
               const existing=dbByKey.get(key);
 
@@ -2026,7 +2027,8 @@ function renderDailySummary(){
         const [hh,mm]=endTime.split(":").map(Number);
         const dt=new Date(r.lesson_date+"T12:00:00");
         dt.setHours(hh||0,mm||0,0,0);
-        if(dt<=now) merged.push(r);
+        const historyThreshold=new Date(dt.getTime() + 30*60*1000);
+        if(historyThreshold<=now) merged.push(r);
       });
 
       const selectedStatus=filter?.value || "all";
@@ -2040,7 +2042,7 @@ function renderDailySummary(){
 
       if(rows.length===0){
         target.innerHTML=selectedStatus==="pending"
-          ? '<div class="historyEmpty">Nessuna lezione trascorsa ancora da confermare.</div>'
+          ? '<div class="historyEmpty">Nessuna lezione conclusa da almeno 30 minuti ancora da confermare.</div>'
           : '<div class="historyEmpty">Nessuna lezione registrata per questo periodo.</div>';
         return;
       }
@@ -2053,7 +2055,7 @@ function renderDailySummary(){
         const status=statusFromDb(r.status);
         const sub=r.substituted_by?` · ${r.substituted_by}`:"";
         const note=r.note?`<div class="historyMeta">Nota: ${escapeHtml(r.note)}</div>`:"";
-        const reminder=r.status==="pending"?'<div class="historyMeta" style="color:#b45309;font-weight:700">⚠ Da verificare: lezione già trascorsa</div>':"";
+        const reminder=r.status==="pending"?'<div class="historyMeta" style="color:#b45309;font-weight:700">⚠ Da verificare: lezione conclusa da almeno 30 min</div>':"";
         return `<div class="historyItem ${historyCssStatus(r.status)}">
           <div class="historyTop">
             <div>
