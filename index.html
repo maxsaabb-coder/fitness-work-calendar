@@ -848,6 +848,7 @@ function renderDays(){
     await refreshAdminStatus();
     document.getElementById("loginBox").style.display = "none";
     await loadWeekFromSupabase();
+    await renderLessonHistory();
   }
 
   async function checkSession() {
@@ -857,6 +858,7 @@ function renderDays(){
       document.getElementById("loginBox").style.display = "none";
       isReadOnly = data.session.user?.email === "maxsaabb@gmail.com";
       await refreshAdminStatus();
+      await renderLessonHistory();
     } else {
       document.getElementById("loginBox").style.display = "block";
       isReadOnly = false;
@@ -874,6 +876,7 @@ function renderDays(){
       syncAccessUI();
     } else {
       refreshAdminStatus();
+      renderLessonHistory();
     }
     document.getElementById("loginBox").style.display = session ? "none" : "block";
   });
@@ -2155,6 +2158,7 @@ async function loadWeekFromSupabase(){
   if (!document.hidden) {
     loadWeekFromSupabase();
     refreshAdminStatus();
+    renderLessonHistory();
   }
 });
 
