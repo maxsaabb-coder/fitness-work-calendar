@@ -741,67 +741,96 @@ function getData(key){
  catch{return {status:"Da confermare",note:"",sub:""}}
 }
 
-function setData(key,data){
+async function setData(key,data){
   if (isReadOnly && (!adminMode || Date.now() >= adminUntil)) {
     adminMode = false;
     adminUntil = 0;
     syncAccessUI();
     alert("La modalità amministratore non è attiva o è scaduta.");
-    return;
+    return false;
   }
-  localStorage.setItem("olga_"+key,JSON.stringify(data));
-  syncToSupabase(key,data,schedule.find(r=>keyFor(r)===key));  
+
+  const normalized = {
+    status: data.status || "Da confermare",
+    note: String(data.note || "").trim(),
+    sub: String(data.sub || "").trim()
+  };
+
+  localStorage.setItem("olga_"+key, JSON.stringify(normalized));
+  const ok = await syncToSupabase(key, normalized, schedule.find(r=>keyFor(r)===key));
+  if (!ok) return false;
+
+  // Rilegge subito il dato salvato: così nota, stato e storico restano allineati.
+  await loadWeekFromSupabase();
+  return true;
 }
 
 async function syncToSupabase(key,data,row){
   try {
+    if (!row) throw new Error("Lezione non trovata nell'orario standard");
+
     const parts = key.split("_");
     const lessonDate = parts[0];
     const startTime = parts[1];
     const gymCode = parts[2] === "A&R" ? "AR" : parts[2];
     const lessonName = parts.slice(3).join("_");
+
     const { data: existing, error: findError } = await supabaseClient
-    .from("lessons")
-    .select("id")
-    .eq("lesson_date", lessonDate)
-    .eq("start_time", startTime)
-    .eq("gym_code", gymCode)
-    .eq("lesson_name", lessonName)
-    .limit(1);
-    if (findError) throw findError;
-    const lessonData = {
-  lesson_date: lessonDate,
-  start_time: startTime,
-  end_time: row[2],
-  gym_code: gymCode,
-  lesson_name: lessonName,
-  minutes: row[5],
-  price: row[6],
-  status: statusToDb(data.status),
-  note: data.note || "",
-  substituted_by: data.sub || "",
-  modified_at: new Date().toISOString()
-};
-    if (existing && existing.length > 0) {
-      const { error } = await supabaseClient
       .from("lessons")
-        .update(lessonData)
-      .eq("id", existing[0].id);
-      if (error) throw error;
-      } else {
-      const { error } = await supabaseClient
+      .select("id,status,note,substituted_by")
+      .eq("lesson_date", lessonDate)
+      .eq("start_time", startTime)
+      .eq("gym_code", gymCode)
+      .eq("lesson_name", lessonName)
+      .limit(1);
+    if (findError) throw findError;
+
+    const lessonData = {
+      lesson_date: lessonDate,
+      start_time: startTime,
+      end_time: row[2],
+      gym_code: gymCode,
+      lesson_name: lessonName,
+      minutes: row[5],
+      price: row[6],
+      status: statusToDb(data.status),
+      note: String(data.note || "").trim(),
+      substituted_by: String(data.sub || "").trim(),
+      modified_at: new Date().toISOString()
+    };
+
+    let saved;
+    if (existing && existing.length > 0) {
+      const { data: updated, error } = await supabaseClient
         .from("lessons")
-        .insert([lessonData]);
+        .update(lessonData)
+        .eq("id", existing[0].id)
+        .select("id,status,note,substituted_by,modified_at")
+        .single();
       if (error) throw error;
-      }
-      return true;
-    } catch (err) {
-      console.error("Errore Supabase:", err);
-      alert("La modifica non è stata salvata sul database. I dati verranno ricaricati.");
-      loadWeekFromSupabase();
-      return false;
+      saved = updated;
+    } else {
+      const { data: inserted, error } = await supabaseClient
+        .from("lessons")
+        .insert([lessonData])
+        .select("id,status,note,substituted_by,modified_at")
+        .single();
+      if (error) throw error;
+      saved = inserted;
     }
+
+    // Controllo esplicito: la nota deve essere identica a quella appena salvata.
+    if (String(saved?.note || "") !== lessonData.note) {
+      throw new Error("Verifica nota fallita dopo il salvataggio");
+    }
+    return true;
+  } catch (err) {
+    console.error("Errore Supabase:", err);
+    alert("La modifica non è stata salvata correttamente sul database. I dati verranno ricaricati.");
+    await loadWeekFromSupabase();
+    return false;
   }
+}
 
 function fmtDate(d){
  return d.toLocaleDateString("it-IT",{day:"numeric",month:"short"});
@@ -2266,13 +2295,13 @@ function renderDailySummary(){
  syncAccessUI();
 }
 
-function quickDone(index){
+async function quickDone(index){
  let rows=schedule.filter(x=>x[0]===selectedDay);
  let r=rows[index];
  let d=getData(keyFor(r));
  d.status="Svolta";
  d.sub="";
- setData(keyFor(r),d);
+ await setData(keyFor(r),d);
  render();
 }
 
@@ -2298,15 +2327,18 @@ function openModal(index){
  document.getElementById("modal").classList.add("show");
 }
 
-function saveStatus(status){
+async function saveStatus(status){
  if(!selected)return;
- let d=getData(keyFor(selected));
+ const lesson=selected;
+ let d=getData(keyFor(lesson));
  d.status=status;
- d.note=document.getElementById("note").value;
+ d.note=document.getElementById("note").value.trim();
  if(status!=="Sostituita")d.sub="";
- setData(keyFor(selected),d);
- closeModal();
- render();
+ const ok=await setData(keyFor(lesson),d);
+ if(ok){
+   closeModal();
+   render();
+ }
 }
 
 function showSub(){
@@ -2314,16 +2346,19 @@ function showSub(){
  document.getElementById("subName").focus();
 }
 
-function saveSub(){
+async function saveSub(){
  let name=document.getElementById("subName").value.trim();
  if(!name){alert("Inserisci il nome di chi ha sostituito Olga.");return}
- let d=getData(keyFor(selected));
+ const lesson=selected;
+ let d=getData(keyFor(lesson));
  d.status="Sostituita";
  d.sub=name;
- d.note=document.getElementById("note").value;
- setData(keyFor(selected),d);
- closeModal();
- render();
+ d.note=document.getElementById("note").value.trim();
+ const ok=await setData(keyFor(lesson),d);
+ if(ok){
+   closeModal();
+   render();
+ }
 }
 
 function closeModal(){
