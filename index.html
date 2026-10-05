@@ -301,6 +301,22 @@ main{
   .donutWrap{flex-direction:column;align-items:flex-start}
 }
 
+
+.historyHub{margin-top:24px}
+.historyControls{display:grid;grid-template-columns:44px 1fr 44px;gap:10px;align-items:center;margin-bottom:10px}
+.historyControls button{height:44px;border:0;border-radius:12px;background:white;box-shadow:0 1px 4px #0002;font-size:22px;cursor:pointer}
+.historyTitle{text-align:center;font-weight:800}
+.historyFilter{display:flex;gap:8px;align-items:center;margin:8px 0 12px;flex-wrap:wrap}
+.historyFilter select{padding:9px 10px;border:1px solid #d1d5db;border-radius:9px;background:white}
+.historyList{display:grid;gap:8px}
+.historyItem{background:white;border-radius:12px;padding:12px;box-shadow:0 1px 4px #0001;border-left:5px solid #9ca3af}
+.historyItem.done{border-left-color:#16a34a}.historyItem.cancel{border-left-color:#dc2626}.historyItem.sub{border-left-color:#2563eb}.historyItem.absent{border-left-color:#f59e0b}.historyItem.closed{border-left-color:#7c3aed}
+.historyTop{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.historyDate{font-weight:800}.historyMeta{font-size:13px;color:#6b7280;margin-top:3px}.historyStatus{font-weight:800;margin-top:6px}
+.historyActions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.historyActions button{border:1px solid #d1d5db;background:#f9fafb;border-radius:9px;padding:8px 10px;font-weight:700;cursor:pointer}
+.historyEmpty{background:white;border-radius:12px;padding:16px;color:#6b7280;text-align:center}
+@media(max-width:500px){.historyTop{flex-direction:column}.historyActions button{flex:1}}
+
 footer{
   text-align:center;
   color:#6b7280;
@@ -452,6 +468,27 @@ footer{
     <div id="economicCharts"></div>
   </div>
 </div>
+
+<div class="gymTotals historyHub">
+  <div class="historyControls">
+    <button onclick="changeHistoryMonth(-1)">‹</button>
+    <div id="historyTitle" class="historyTitle">Storico lezioni</div>
+    <button onclick="changeHistoryMonth(1)">›</button>
+  </div>
+  <div class="historyFilter">
+    <strong>Stato:</strong>
+    <select id="historyStatusFilter" onchange="renderLessonHistory()">
+      <option value="all">Tutti</option>
+      <option value="done">Svolte</option>
+      <option value="pending">Da confermare</option>
+      <option value="gym_cancelled">Annullate palestra</option>
+      <option value="olga_absent">Assenza Olga</option>
+      <option value="substituted">Sostituite</option>
+      <option value="holiday_closed">Chiusura / Festività</option>
+    </select>
+  </div>
+  <div id="lessonHistoryList" class="historyList"></div>
+</div>
 </div>
 </div>
 </div>
@@ -530,6 +567,7 @@ const dayNames=["","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì"];
 let selectedDay=1;
 let currentWeek=getMonday(new Date());
   let summaryMonth = new Date();
+  let historyMonth = new Date();
   let summaryYear = new Date().getFullYear();
 let selected=null;
 
@@ -1881,6 +1919,117 @@ function renderDailySummary(){
   document.getElementById("money").textContent="€"+money;
   document.getElementById("notDone").textContent=notDone;
 }
+
+  function canEditLessons(){
+    return !isReadOnly || (adminMode && Date.now() < adminUntil);
+  }
+
+  function historyCssStatus(s){
+    if(s==="done") return "done";
+    if(s==="gym_cancelled") return "cancel";
+    if(s==="olga_absent") return "absent";
+    if(s==="substituted") return "sub";
+    if(s==="holiday_closed") return "closed";
+    return "";
+  }
+
+  async function renderLessonHistory(){
+    const target=document.getElementById("lessonHistoryList");
+    const title=document.getElementById("historyTitle");
+    const filter=document.getElementById("historyStatusFilter");
+    if(!target || !title) return;
+
+    const monthDate=new Date(historyMonth);
+    const y=monthDate.getFullYear();
+    const m=monthDate.getMonth();
+    const start=iso(new Date(y,m,1));
+    const end=iso(new Date(y,m+1,0));
+    title.textContent="Storico lezioni · "+monthDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+    target.innerHTML='<div class="historyEmpty">Caricamento storico…</div>';
+
+    try{
+      let q=supabaseClient
+        .from("lessons")
+        .select("id,lesson_date,start_time,end_time,gym_code,lesson_name,minutes,price,status,note,substituted_by,modified_at")
+        .gte("lesson_date",start)
+        .lte("lesson_date",end)
+        .order("lesson_date",{ascending:false})
+        .order("start_time",{ascending:true});
+
+      const selectedStatus=filter?.value || "all";
+      if(selectedStatus!=="all") q=q.eq("status",selectedStatus);
+
+      const {data,error}=await q;
+      if(error) throw error;
+      const rows=data || [];
+      if(rows.length===0){
+        target.innerHTML='<div class="historyEmpty">Nessuna lezione registrata per questo periodo.</div>';
+        return;
+      }
+
+      const editable=canEditLessons();
+      target.innerHTML=rows.map(r=>{
+        const d=new Date(r.lesson_date+"T12:00:00");
+        const dateLabel=d.toLocaleDateString("it-IT",{weekday:"short",day:"numeric",month:"short"});
+        const gym=r.gym_code==="AR"?"A&R":r.gym_code;
+        const status=statusFromDb(r.status);
+        const sub=r.substituted_by?` · ${r.substituted_by}`:"";
+        const note=r.note?`<div class="historyMeta">Nota: ${escapeHtml(r.note)}</div>`:"";
+        return `<div class="historyItem ${historyCssStatus(r.status)}">
+          <div class="historyTop">
+            <div>
+              <div class="historyDate">${dateLabel} · ${String(r.start_time).slice(0,5)}–${String(r.end_time||'').slice(0,5)}</div>
+              <div><strong>${escapeHtml(r.lesson_name||'')}</strong></div>
+              <div class="historyMeta">${gym} · ${r.minutes||0} min · €${Number(r.price||0).toFixed(2).replace('.',',')}</div>
+              <div class="historyStatus">${status}${escapeHtml(sub)}</div>
+              ${note}
+            </div>
+          </div>
+          <div class="historyActions">
+            <button onclick="openHistoryWeek('${r.lesson_date}')">Apri settimana</button>
+            ${editable?`<button onclick="editHistoryLesson('${r.lesson_date}','${String(r.start_time).slice(0,5)}','${gym}','${escapeJsSingle(r.lesson_name||'')}')">Modifica</button>`:""}
+          </div>
+        </div>`;
+      }).join("");
+    }catch(err){
+      console.error("Errore storico lezioni:",err);
+      target.innerHTML='<div class="historyEmpty">Impossibile caricare lo storico lezioni.</div>';
+    }
+  }
+
+  function escapeHtml(v){
+    return String(v??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  }
+
+  function escapeJsSingle(v){
+    return String(v??"").replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/\n/g," ");
+  }
+
+  function changeHistoryMonth(delta){
+    historyMonth=new Date(historyMonth.getFullYear(),historyMonth.getMonth()+delta,1);
+    renderLessonHistory();
+  }
+
+  async function openHistoryWeek(dateStr){
+    const d=new Date(dateStr+"T12:00:00");
+    currentWeek=getMonday(d);
+    const wd=d.getDay();
+    selectedDay=(wd>=1&&wd<=5)?wd:1;
+    await loadWeekFromSupabase();
+    window.scrollTo({top:0,behavior:"smooth"});
+  }
+
+  async function editHistoryLesson(dateStr,start,gym,name){
+    await openHistoryWeek(dateStr);
+    const rows=schedule.filter(x=>x[0]===selectedDay);
+    const index=rows.findIndex(r=>r[1]===start && r[3]===gym && r[4]===name);
+    if(index<0){
+      alert("Questa lezione non coincide con l'orario standard attuale. Apri la settimana e controllala manualmente.");
+      return;
+    }
+    openModal(index);
+  }
+
   function render(){
  renderWeekLabel();
  renderDays();
