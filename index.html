@@ -2313,8 +2313,12 @@ async function quickDone(index){
  let d=getData(keyFor(r));
  d.status="Svolta";
  d.sub="";
- await setData(keyFor(r),d);
- render();
+ const ok=await setData(keyFor(r),d);
+ if(ok){
+   await loadWeekFromSupabase();
+   await renderLessonHistory();
+   render();
+ }
 }
 
 function allDone(){
@@ -2349,6 +2353,8 @@ async function saveStatus(status){
  const ok=await setData(keyFor(lesson),d);
  if(ok){
    closeModal();
+   await loadWeekFromSupabase();
+   await renderLessonHistory();
    render();
  }
 }
@@ -2367,6 +2373,10 @@ async function saveNote(){
  const ok=await setData(keyFor(lesson),d);
  if(ok){
    closeModal();
+   // Rileggi subito Supabase e aggiorna anche lo Storico lezioni:
+   // così la nota appena salvata compare senza dover fare refresh manuale.
+   await loadWeekFromSupabase();
+   await renderLessonHistory();
    render();
  }
 }
@@ -2382,6 +2392,8 @@ async function saveSub(){
  const ok=await setData(keyFor(lesson),d);
  if(ok){
    closeModal();
+   await loadWeekFromSupabase();
+   await renderLessonHistory();
    render();
  }
 }
