@@ -318,6 +318,10 @@ main{
 @media(max-width:500px){.historyTop{flex-direction:column}.historyActions button{flex:1}}
 .historyAudit{margin-top:8px;padding-top:8px;border-top:1px dashed #e5e7eb;font-size:12px;color:#6b7280}
 .historyAudit button{margin-top:6px;border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:6px 9px;font-weight:700;cursor:pointer}
+.lessonNoteAudit{margin-top:8px;padding:8px 10px;border-radius:10px;background:#f8fafc;border:1px solid #e5e7eb;font-size:12px;color:#374151}
+.lessonNoteAudit+.lessonNoteAudit{margin-top:6px}
+.lessonNoteMeta{font-weight:700;color:#6b7280;margin-bottom:2px}
+.lessonNoteText{white-space:pre-wrap}
 .auditList{display:grid;gap:10px;margin-top:10px;max-height:55vh;overflow:auto}
 .auditItem{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb}
 .auditWhen{font-weight:800;margin-bottom:4px}.auditWho{font-size:12px;color:#6b7280;margin-bottom:6px}.auditChange{font-size:13px;line-height:1.45}
@@ -583,6 +587,7 @@ let currentWeek=getMonday(new Date());
   let historyMonth = new Date();
   let summaryYear = new Date().getFullYear();
 let selected=null;
+let weekNoteAuditMap = new Map();
 
 const standardTravelByWeekday = {
   1:{name:"Lunedì",km:5.6,trips:6,walk:1.6},
@@ -1030,6 +1035,17 @@ function statusToDb(s){
  return"";
 }
 
+function renderLessonNotes(lessonKey,currentNote){
+ const entries=weekNoteAuditMap.get(lessonKey)||[];
+ if(entries.length){
+   return entries.map(e=>`<div class="lessonNoteAudit"><div class="lessonNoteMeta">Nota · ${formatAuditDate(e.changed_at)} · ${actorLabel(e.changed_by_email)}</div><div class="lessonNoteText">${escapeHtml(e.text)}</div></div>`).join("");
+ }
+ if(currentNote){
+   return `<div class="lessonNoteAudit"><div class="lessonNoteMeta">Nota</div><div class="lessonNoteText">${escapeHtml(currentNote)}</div></div>`;
+ }
+ return "";
+}
+
 function renderLessons(){
  const rows=schedule.filter(x=>x[0]===selectedDay);
  let html="";
@@ -1045,7 +1061,7 @@ function renderLessons(){
     <div class="name">${r[4]}</div>
     <div class="gym">${r[3]} · ${r[5]} min</div>
     <div class="status">${data.status}${extra}</div>
-    ${data.note?`<div class="gym">Nota: ${data.note}</div>`:""}
+    ${renderLessonNotes(keyFor(r), data.note)}
     ${(isReadOnly && (!adminMode || Date.now() >= adminUntil)) ? "" : `
 <div class="actions">
   <button onclick="quickDone(${i})">✓ Svolta</button>
@@ -2333,15 +2349,19 @@ async function loadWeekFromSupabase(){
 
     const { data, error } = await supabaseClient
       .from("lessons")
-      .select("lesson_date,start_time,gym_code,lesson_name,status,note,substituted_by")
+      .select("id,lesson_date,start_time,gym_code,lesson_name,status,note,substituted_by,modified_at")
       .gte("lesson_date", start)
       .lte("lesson_date", end);
 
     if(error) throw error;
 
-    (data || []).forEach(item => {
-     const appGymCode = item.gym_code === "AR" ? "A&R" : item.gym_code;
-     const key = item.lesson_date+"_"+String(item.start_time).slice(0,5)+"_"+appGymCode+"_"+item.lesson_name;
+    const rows=data || [];
+    const idToKey=new Map();
+
+    rows.forEach(item => {
+      const appGymCode = item.gym_code === "AR" ? "A&R" : item.gym_code;
+      const key = item.lesson_date+"_"+String(item.start_time).slice(0,5)+"_"+appGymCode+"_"+item.lesson_name;
+      if(item.id) idToKey.set(item.id,key);
 
       localStorage.setItem("olga_"+key, JSON.stringify({
         status: statusFromDb(item.status),
@@ -2349,6 +2369,36 @@ async function loadWeekFromSupabase(){
         sub: item.substituted_by || ""
       }));
     });
+
+    const nextNoteMap=new Map();
+    const lessonIds=[...idToKey.keys()];
+    if(lessonIds.length){
+      const {data:auditData,error:auditError}=await supabaseClient
+        .from("lesson_history")
+        .select("lesson_id,changed_at,changed_by_email,old_data,new_data")
+        .in("lesson_id",lessonIds)
+        .order("changed_at",{ascending:true});
+
+      if(!auditError){
+        (auditData||[]).forEach(a=>{
+          const before=(a.old_data||{}).note ?? "";
+          const after=(a.new_data||{}).note ?? "";
+          if(before===after || !String(after).trim()) return;
+          const key=idToKey.get(a.lesson_id);
+          if(!key) return;
+          if(!nextNoteMap.has(key)) nextNoteMap.set(key,[]);
+          nextNoteMap.get(key).push({
+            text:String(after),
+            changed_at:a.changed_at,
+            changed_by_email:a.changed_by_email
+          });
+        });
+      } else {
+        console.warn("Note storico non disponibili:",auditError);
+      }
+    }
+
+    weekNoteAuditMap=nextNoteMap;
     render();
   } catch(err) {
     console.error("Errore lettura Supabase:", err);
