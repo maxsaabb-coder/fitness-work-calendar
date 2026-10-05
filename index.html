@@ -316,6 +316,11 @@ main{
 .historyActions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.historyActions button{border:1px solid #d1d5db;background:#f9fafb;border-radius:9px;padding:8px 10px;font-weight:700;cursor:pointer}
 .historyEmpty{background:white;border-radius:12px;padding:16px;color:#6b7280;text-align:center}
 @media(max-width:500px){.historyTop{flex-direction:column}.historyActions button{flex:1}}
+.historyAudit{margin-top:8px;padding-top:8px;border-top:1px dashed #e5e7eb;font-size:12px;color:#6b7280}
+.historyAudit button{margin-top:6px;border:1px solid #d1d5db;background:#fff;border-radius:8px;padding:6px 9px;font-weight:700;cursor:pointer}
+.auditList{display:grid;gap:10px;margin-top:10px;max-height:55vh;overflow:auto}
+.auditItem{border:1px solid #e5e7eb;border-radius:10px;padding:10px;background:#f9fafb}
+.auditWhen{font-weight:800;margin-bottom:4px}.auditWho{font-size:12px;color:#6b7280;margin-bottom:6px}.auditChange{font-size:13px;line-height:1.45}
 
 footer{
   text-align:center;
@@ -520,6 +525,14 @@ footer{
 
 <button class="close" onclick="closeModal()">Chiudi</button>
 </div>
+</div>
+
+<div class="modal" id="auditModal">
+  <div class="panel">
+    <h3 id="auditTitle">Storico modifiche</h3>
+    <div id="auditList" class="auditList"></div>
+    <button class="close" onclick="closeLessonAudit()">Chiudi</button>
+  </div>
 </div>
 
 <script>
@@ -1964,6 +1977,26 @@ function renderDailySummary(){
       if(error) throw error;
 
       const dbRows=data || [];
+
+      // Recupera il registro modifiche delle lezioni reali del mese.
+      const lessonIds=dbRows.map(r=>r.id).filter(Boolean);
+      let auditRows=[];
+      if(lessonIds.length){
+        const {data:auditData,error:auditError}=await supabaseClient
+          .from("lesson_history")
+          .select("lesson_id,changed_at,changed_by_email,action,old_data,new_data")
+          .in("lesson_id",lessonIds)
+          .order("changed_at",{ascending:false});
+        if(!auditError) auditRows=auditData || [];
+        else console.warn("Storico modifiche non disponibile:",auditError);
+      }
+
+      const auditByLesson=new Map();
+      auditRows.forEach(a=>{
+        if(!auditByLesson.has(a.lesson_id)) auditByLesson.set(a.lesson_id,[]);
+        auditByLesson.get(a.lesson_id).push(a);
+      });
+
       const dbByKey=new Map();
       dbRows.forEach(r=>{
         const gym=r.gym_code==="AR"?"A&R":r.gym_code;
@@ -2056,6 +2089,11 @@ function renderDailySummary(){
         const sub=r.substituted_by?` · ${r.substituted_by}`:"";
         const note=r.note?`<div class="historyMeta">Nota: ${escapeHtml(r.note)}</div>`:"";
         const reminder=r.status==="pending"?'<div class="historyMeta" style="color:#b45309;font-weight:700">⚠ Da verificare: lezione conclusa da almeno 30 min</div>':"";
+        const changes=r.id ? (auditByLesson.get(r.id) || []) : [];
+        const latestChange=changes[0] || null;
+        const auditHtml=latestChange
+          ? `<div class="historyAudit">Ultima modifica: ${formatAuditDate(latestChange.changed_at)} · ${actorLabel(latestChange.changed_by_email)}<br><button onclick="openLessonAudit('${r.id}','${escapeJsSingle(r.lesson_name||'')}','${r.lesson_date}','${String(r.start_time).slice(0,5)}')">Vedi storico (${changes.length})</button></div>`
+          : (r.id ? '<div class="historyAudit">Nessuna modifica registrata da quando è attivo il registro.</div>' : '');
         return `<div class="historyItem ${historyCssStatus(r.status)}">
           <div class="historyTop">
             <div>
@@ -2065,6 +2103,7 @@ function renderDailySummary(){
               <div class="historyStatus">${status}${escapeHtml(sub)}</div>
               ${reminder}
               ${note}
+              ${auditHtml}
             </div>
           </div>
           <div class="historyActions">
@@ -2085,6 +2124,88 @@ function renderDailySummary(){
 
   function escapeJsSingle(v){
     return String(v??"").replace(/\\/g,"\\\\").replace(/'/g,"\\'").replace(/\n/g," ");
+  }
+
+  function actorLabel(email){
+    const e=String(email||"").toLowerCase();
+    if(e==="olgaplaksinait@gmail.com") return "Olga";
+    if(e==="maxsaabb@gmail.com") return "Max";
+    return email ? String(email) : "Utente";
+  }
+
+  function formatAuditDate(value){
+    if(!value) return "—";
+    const d=new Date(value);
+    if(Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleString("it-IT",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"});
+  }
+
+  function auditValue(field,value){
+    if(field==="status") return statusFromDb(value);
+    if(value===null || value===undefined || value==="") return "—";
+    if(field==="price") return "€"+Number(value||0).toFixed(2).replace(".",",");
+    return String(value);
+  }
+
+  function describeAuditChange(row){
+    const oldData=row.old_data || {};
+    const newData=row.new_data || {};
+    const fields=[
+      ["status","Stato"],
+      ["note","Nota"],
+      ["substituted_by","Sostituita da"],
+      ["price","Compenso"],
+      ["minutes","Durata"],
+      ["lesson_name","Lezione"],
+      ["start_time","Ora inizio"],
+      ["end_time","Ora fine"]
+    ];
+    const changes=[];
+    fields.forEach(([key,label])=>{
+      const before=oldData[key];
+      const after=newData[key];
+      if(JSON.stringify(before)!==JSON.stringify(after)){
+        changes.push(`<div class="auditChange"><b>${label}:</b> ${escapeHtml(auditValue(key,before))} → ${escapeHtml(auditValue(key,after))}</div>`);
+      }
+    });
+    return changes.length ? changes.join("") : '<div class="auditChange">Modifica tecnica registrata.</div>';
+  }
+
+  async function openLessonAudit(lessonId,lessonName,dateStr,startTime){
+    const modal=document.getElementById("auditModal");
+    const title=document.getElementById("auditTitle");
+    const list=document.getElementById("auditList");
+    if(!modal || !title || !list) return;
+
+    title.textContent=`Storico modifiche · ${lessonName}`;
+    list.innerHTML='<div class="historyEmpty">Caricamento modifiche…</div>';
+    modal.classList.add("show");
+
+    try{
+      const {data,error}=await supabaseClient
+        .from("lesson_history")
+        .select("lesson_id,changed_at,changed_by_email,action,old_data,new_data")
+        .eq("lesson_id",lessonId)
+        .order("changed_at",{ascending:false});
+      if(error) throw error;
+      const rows=data || [];
+      if(!rows.length){
+        list.innerHTML='<div class="historyEmpty">Nessuna modifica registrata da quando è attivo il registro.</div>';
+        return;
+      }
+      list.innerHTML=rows.map(r=>`<div class="auditItem">
+        <div class="auditWhen">${formatAuditDate(r.changed_at)}</div>
+        <div class="auditWho">${actorLabel(r.changed_by_email)}</div>
+        ${describeAuditChange(r)}
+      </div>`).join("");
+    }catch(err){
+      console.error("Errore caricamento storico modifiche:",err);
+      list.innerHTML='<div class="historyEmpty">Impossibile caricare lo storico modifiche.</div>';
+    }
+  }
+
+  function closeLessonAudit(){
+    document.getElementById("auditModal")?.classList.remove("show");
   }
 
   function changeHistoryMonth(delta){
