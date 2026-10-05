@@ -1945,13 +1945,15 @@ function renderDailySummary(){
     const monthDate=new Date(historyMonth);
     const y=monthDate.getFullYear();
     const m=monthDate.getMonth();
-    const start=iso(new Date(y,m,1));
-    const end=iso(new Date(y,m+1,0));
+    const firstDay=new Date(y,m,1,12,0,0,0);
+    const lastDay=new Date(y,m+1,0,12,0,0,0);
+    const start=iso(firstDay);
+    const end=iso(lastDay);
     title.textContent="Storico lezioni · "+monthDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
     target.innerHTML='<div class="historyEmpty">Caricamento storico…</div>';
 
     try{
-      let q=supabaseClient
+      const {data,error}=await supabaseClient
         .from("lessons")
         .select("id,lesson_date,start_time,end_time,gym_code,lesson_name,minutes,price,status,note,substituted_by,modified_at")
         .gte("lesson_date",start)
@@ -1959,14 +1961,87 @@ function renderDailySummary(){
         .order("lesson_date",{ascending:false})
         .order("start_time",{ascending:true});
 
-      const selectedStatus=filter?.value || "all";
-      if(selectedStatus!=="all") q=q.eq("status",selectedStatus);
-
-      const {data,error}=await q;
       if(error) throw error;
-      const rows=data || [];
+
+      const dbRows=data || [];
+      const dbByKey=new Map();
+      dbRows.forEach(r=>{
+        const gym=r.gym_code==="AR"?"A&R":r.gym_code;
+        const key=`${r.lesson_date}_${String(r.start_time).slice(0,5)}_${gym}_${r.lesson_name||""}`;
+        dbByKey.set(key,{...r,_gymDisplay:gym});
+      });
+
+      // Costruisce lo storico operativo: include soltanto lezioni il cui orario è già trascorso.
+      // Se una lezione prevista non ha ancora una riga in Supabase, viene mostrata come "Da confermare"
+      // così funziona anche da promemoria per eventuali ore dimenticate.
+      const now=new Date();
+      const merged=[];
+      const cursor=new Date(firstDay);
+
+      while(cursor<=lastDay){
+        const dayIso=iso(cursor);
+        const wd=cursor.getDay();
+
+        if(wd>=1 && wd<=5){
+          schedule.filter(r=>r[0]===wd).forEach(r=>{
+            const endParts=String(r[2]).split(":").map(Number);
+            const lessonEnd=new Date(cursor);
+            lessonEnd.setHours(endParts[0]||0,endParts[1]||0,0,0);
+
+            if(lessonEnd<=now){
+              const key=`${dayIso}_${r[1]}_${r[3]}_${r[4]}`;
+              const existing=dbByKey.get(key);
+
+              if(existing){
+                merged.push(existing);
+                dbByKey.delete(key);
+              }else{
+                merged.push({
+                  id:null,
+                  lesson_date:dayIso,
+                  start_time:r[1],
+                  end_time:r[2],
+                  gym_code:r[3]==="A&R"?"AR":r[3],
+                  lesson_name:r[4],
+                  minutes:r[5],
+                  price:r[6],
+                  status:"pending",
+                  note:"",
+                  substituted_by:"",
+                  modified_at:null,
+                  _gymDisplay:r[3],
+                  _synthetic:true
+                });
+              }
+            }
+          });
+        }
+
+        cursor.setDate(cursor.getDate()+1);
+      }
+
+      // Mantiene nello storico anche eventuali righe reali passate non coincidenti con l'orario standard.
+      dbByKey.forEach(r=>{
+        const endTime=String(r.end_time || r.start_time || "00:00").slice(0,5);
+        const [hh,mm]=endTime.split(":").map(Number);
+        const dt=new Date(r.lesson_date+"T12:00:00");
+        dt.setHours(hh||0,mm||0,0,0);
+        if(dt<=now) merged.push(r);
+      });
+
+      const selectedStatus=filter?.value || "all";
+      let rows=merged;
+      if(selectedStatus!=="all") rows=rows.filter(r=>r.status===selectedStatus);
+
+      rows.sort((a,b)=>{
+        if(a.lesson_date!==b.lesson_date) return b.lesson_date.localeCompare(a.lesson_date);
+        return String(a.start_time).localeCompare(String(b.start_time));
+      });
+
       if(rows.length===0){
-        target.innerHTML='<div class="historyEmpty">Nessuna lezione registrata per questo periodo.</div>';
+        target.innerHTML=selectedStatus==="pending"
+          ? '<div class="historyEmpty">Nessuna lezione trascorsa ancora da confermare.</div>'
+          : '<div class="historyEmpty">Nessuna lezione registrata per questo periodo.</div>';
         return;
       }
 
@@ -1974,10 +2049,11 @@ function renderDailySummary(){
       target.innerHTML=rows.map(r=>{
         const d=new Date(r.lesson_date+"T12:00:00");
         const dateLabel=d.toLocaleDateString("it-IT",{weekday:"short",day:"numeric",month:"short"});
-        const gym=r.gym_code==="AR"?"A&R":r.gym_code;
+        const gym=r._gymDisplay || (r.gym_code==="AR"?"A&R":r.gym_code);
         const status=statusFromDb(r.status);
         const sub=r.substituted_by?` · ${r.substituted_by}`:"";
         const note=r.note?`<div class="historyMeta">Nota: ${escapeHtml(r.note)}</div>`:"";
+        const reminder=r.status==="pending"?'<div class="historyMeta" style="color:#b45309;font-weight:700">⚠ Da verificare: lezione già trascorsa</div>':"";
         return `<div class="historyItem ${historyCssStatus(r.status)}">
           <div class="historyTop">
             <div>
@@ -1985,6 +2061,7 @@ function renderDailySummary(){
               <div><strong>${escapeHtml(r.lesson_name||'')}</strong></div>
               <div class="historyMeta">${gym} · ${r.minutes||0} min · €${Number(r.price||0).toFixed(2).replace('.',',')}</div>
               <div class="historyStatus">${status}${escapeHtml(sub)}</div>
+              ${reminder}
               ${note}
             </div>
           </div>
