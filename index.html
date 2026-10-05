@@ -526,6 +526,7 @@ footer{
 
 <label>Nota</label>
 <textarea id="note" placeholder="Nota facoltativa"></textarea>
+<button class="s1" onclick="saveNote()">Salva nota</button>
 
 <button class="close" onclick="closeModal()">Chiudi</button>
 </div>
@@ -801,10 +802,21 @@ async function syncToSupabase(key,data,row){
 
     let saved;
     if (existing && existing.length > 0) {
+      const current = existing[0];
+      const sameStatus = String(current.status || "") === String(lessonData.status || "");
+      const sameNote = String(current.note || "").trim() === String(lessonData.note || "").trim();
+      const sameSub = String(current.substituted_by || "").trim() === String(lessonData.substituted_by || "").trim();
+
+      // Se non è cambiato nulla di reale, non facciamo UPDATE:
+      // evita righe di storico "tecniche" dovute al solo modified_at.
+      if (sameStatus && sameNote && sameSub) {
+        return true;
+      }
+
       const { data: updated, error } = await supabaseClient
         .from("lessons")
         .update(lessonData)
-        .eq("id", existing[0].id)
+        .eq("id", current.id)
         .select("id,status,note,substituted_by,modified_at")
         .single();
       if (error) throw error;
@@ -2344,6 +2356,19 @@ async function saveStatus(status){
 function showSub(){
  document.getElementById("subBox").style.display="block";
  document.getElementById("subName").focus();
+}
+
+async function saveNote(){
+ if(!selected)return;
+ const lesson=selected;
+ let d=getData(keyFor(lesson));
+ d.note=document.getElementById("note").value.trim();
+
+ const ok=await setData(keyFor(lesson),d);
+ if(ok){
+   closeModal();
+   render();
+ }
 }
 
 async function saveSub(){
