@@ -102,6 +102,9 @@ main{
   display:block
 }
 .dayDot.event{background:#7c3aed}
+.dayDot.event.holiday{background:#7c3aed}
+.dayDot.event.gym_closed{background:#dc2626}
+.dayDot.event.olga_vacation{background:#f59e0b}
 .dayDot.missed{background:#ef4444}
 
 .daytitle{
@@ -1087,9 +1090,14 @@ function renderDays(){
    const d=dateForDay(i);
    const dayIso=iso(d);
 
-   const hasEvent=(calendarExceptions||[]).some(ex=>
-     ex.start_date<=dayIso && ex.end_date>=dayIso
-   );
+   const dayEvents=(calendarExceptions||[])
+     .filter(ex=>ex.start_date<=dayIso && ex.end_date>=dayIso);
+
+   const eventType=dayEvents.length
+     ? dayEvents.sort((a,b)=>exceptionPriority(b)-exceptionPriority(a))[0].exception_type
+     : "";
+
+   const hasEvent=dayEvents.length>0;
 
    const hasMissed=schedule
      .filter(r=>r[0]===i)
@@ -1098,9 +1106,14 @@ function renderDays(){
        return s==="Annullata palestra" || s==="Assenza Olga";
      });
 
+   const eventTitle=
+     eventType==="olga_vacation" ? "Assenza Olga" :
+     eventType==="gym_closed" ? "Chiusura palestra" :
+     "Festività / evento";
+
    const dots=(hasEvent || hasMissed)
      ? `<span class="dayDots">
-          ${hasEvent?'<span class="dayDot event" title="Evento programmato"></span>':""}
+          ${hasEvent?`<span class="dayDot event ${eventType}" title="${eventTitle}"></span>`:""}
           ${hasMissed?'<span class="dayDot missed" title="Lezione non svolta"></span>':""}
         </span>`
      : "";
