@@ -370,6 +370,13 @@ footer{
 .exceptionActions button{border:1px solid #d1d5db;background:white;border-radius:9px;padding:8px 10px;font-weight:700;cursor:pointer}
 .exceptionActions .danger{color:#b91c1c}
 .exceptionEmpty{padding:20px;text-align:center;color:#6b7280;background:white;border-radius:14px}
+.dayExceptionBanner{max-width:850px;margin:12px auto 0;padding:0 14px}
+.dayExceptionNotice{background:#fff7ed;border:1px solid #fdba74;border-left:5px solid #f59e0b;border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.dayExceptionNotice.holiday{background:#faf5ff;border-color:#c4b5fd;border-left-color:#7c3aed}
+.dayExceptionNotice.gym_closed{background:#fef2f2;border-color:#fecaca;border-left-color:#dc2626}
+.dayExceptionNotice.olga_vacation{background:#fffbeb;border-color:#fde68a;border-left-color:#f59e0b}
+.dayExceptionNotice strong{display:block;margin-bottom:3px}
+.dayExceptionNotice small{color:#6b7280}
 @media(max-width:600px){.exceptionChoices{grid-template-columns:1fr}.exceptionFormGrid{grid-template-columns:1fr}.exceptionForm .full{grid-column:auto}.topTools{justify-content:stretch}.exceptionOpenBtn{width:100%}}
 
 .modal{
@@ -451,6 +458,8 @@ footer{
 <div id="weekLabel"></div>
 <button onclick="changeWeek(7)">›</button>
 </div>
+
+<div id="dayExceptionBanner" class="dayExceptionBanner"></div>
 
 <button class="today" onclick="goToday()">Torna a oggi</button>
 
@@ -561,13 +570,13 @@ footer{
 
   <div class="exceptionWrap">
     <div class="exceptionIntro">
-      Gestisci qui <b>festività</b>, <b>chiusure di una palestra</b> e <b>ferie di Olga</b>.
+      Gestisci qui <b>festività</b>, <b>chiusure di una palestra</b> e <b>assenze di Olga</b>.
     </div>
 
     <div class="exceptionChoices">
       <button id="exceptionTypeHoliday" class="exceptionChoice active" onclick="setExceptionType('holiday')">🎉 Festività</button>
       <button id="exceptionTypeGym" class="exceptionChoice" onclick="setExceptionType('gym_closed')">🏢 Chiusura palestra</button>
-      <button id="exceptionTypeVacation" class="exceptionChoice" onclick="setExceptionType('olga_vacation')">🏖️ Ferie Olga</button>
+      <button id="exceptionTypeVacation" class="exceptionChoice" onclick="setExceptionType('olga_vacation')">👤 Assenza Olga</button>
     </div>
 
     <div id="exceptionFormBox" class="exceptionForm">
@@ -582,6 +591,15 @@ footer{
             <option value="MAX">MAX</option>
             <option value="TN">TN</option>
             <option value="STSM">STSM</option>
+          </select>
+        </div>
+
+        <div id="exceptionReasonWrap" style="display:none">
+          <label>Motivo</label>
+          <select id="exceptionReason">
+            <option value="vacation">Ferie</option>
+            <option value="illness">Malattia</option>
+            <option value="course">Corso / formazione</option>
           </select>
         </div>
 
@@ -2114,12 +2132,26 @@ function renderDailySummary(){
   function exceptionTypeLabel(type){
     if(type==="holiday") return "Festività";
     if(type==="gym_closed") return "Chiusura palestra";
-    if(type==="olga_vacation") return "Ferie Olga";
+    if(type==="olga_vacation") return "Assenza Olga";
     return type || "";
   }
 
   function exceptionGymLabel(code){
     return code==="AR" ? "A&R" : (code || "");
+  }
+
+  function absenceReasonLabel(reason){
+    if(reason==="vacation") return "Ferie";
+    if(reason==="illness") return "Malattia";
+    if(reason==="course") return "Corso / formazione";
+    return "";
+  }
+
+  function absenceReasonIcon(reason){
+    if(reason==="vacation") return "🏖️";
+    if(reason==="illness") return "🤒";
+    if(reason==="course") return "📚";
+    return "👤";
   }
 
   function canEditExceptions(){
@@ -2154,9 +2186,11 @@ function renderDailySummary(){
     });
     const gymWrap=document.getElementById("exceptionGymWrap");
     if(gymWrap) gymWrap.style.display=type==="gym_closed"?"":"none";
+    const reasonWrap=document.getElementById("exceptionReasonWrap");
+    if(reasonWrap) reasonWrap.style.display=type==="olga_vacation"?"":"none";
     const btn=document.getElementById("exceptionSaveBtn");
     if(btn && !editingExceptionId){
-      btn.textContent=type==="holiday"?"Salva festività":type==="gym_closed"?"Salva chiusura palestra":"Salva ferie Olga";
+      btn.textContent=type==="holiday"?"Salva festività":type==="gym_closed"?"Salva chiusura palestra":"Salva assenza Olga";
     }
   }
 
@@ -2167,6 +2201,7 @@ function renderDailySummary(){
     document.getElementById("exceptionStart").value=today;
     document.getElementById("exceptionEnd").value=today;
     document.getElementById("exceptionGym").value="AR";
+    document.getElementById("exceptionReason").value="vacation";
     document.getElementById("exceptionTitle").value="";
     document.getElementById("exceptionNote").value="";
     document.getElementById("exceptionSaveBtn").textContent="Salva festività";
@@ -2185,13 +2220,14 @@ function renderDailySummary(){
     try{
       const {data,error}=await supabaseClient
         .from("calendar_exceptions")
-        .select("id,exception_type,start_date,end_date,gym_code,title,note,created_by_email,created_at,modified_at")
+        .select("id,exception_type,start_date,end_date,gym_code,absence_reason,title,note,created_by_email,created_at,modified_at")
         .order("start_date",{ascending:true});
 
       if(error) throw error;
 
       calendarExceptions=data || [];
       renderCalendarExceptions();
+      renderDayExceptionBanner();
       syncExceptionEditUI();
     }catch(err){
       console.error("Errore caricamento ferie/chiusure:",err);
@@ -2219,6 +2255,10 @@ function renderDailySummary(){
         ? ` · ${exceptionGymLabel(ex.gym_code)}`
         : "";
 
+      const reason=ex.exception_type==="olga_vacation" && ex.absence_reason
+        ? ` · ${absenceReasonIcon(ex.absence_reason)} ${absenceReasonLabel(ex.absence_reason)}`
+        : "";
+
       const note=ex.note ? `<div class="exceptionItemNote">${escapeHtml(ex.note)}</div>` : "";
 
       const actions=editable
@@ -2230,7 +2270,7 @@ function renderDailySummary(){
 
       return `<div class="exceptionItem ${ex.exception_type}">
         <div class="exceptionItemTitle">${escapeHtml(ex.title)}</div>
-        <div class="exceptionItemMeta">${exceptionTypeLabel(ex.exception_type)}${gym} · ${period}</div>
+        <div class="exceptionItemMeta">${exceptionTypeLabel(ex.exception_type)}${reason}${gym} · ${period}</div>
         ${note}
         ${actions}
       </div>`;
@@ -2246,6 +2286,7 @@ function renderDailySummary(){
     const start=document.getElementById("exceptionStart").value;
     const end=document.getElementById("exceptionEnd").value;
     const gym=document.getElementById("exceptionGym").value;
+    const reason=document.getElementById("exceptionReason").value;
     const title=document.getElementById("exceptionTitle").value.trim();
     const note=document.getElementById("exceptionNote").value.trim();
 
@@ -2267,6 +2308,7 @@ function renderDailySummary(){
       start_date:start,
       end_date:end,
       gym_code:exceptionTypeSelected==="gym_closed" ? gym : null,
+      absence_reason:exceptionTypeSelected==="olga_vacation" ? reason : null,
       title,
       note:note || null,
       modified_at:new Date().toISOString()
@@ -2304,6 +2346,7 @@ function renderDailySummary(){
     document.getElementById("exceptionStart").value=ex.start_date;
     document.getElementById("exceptionEnd").value=ex.end_date;
     document.getElementById("exceptionGym").value=ex.gym_code || "AR";
+    document.getElementById("exceptionReason").value=ex.absence_reason || "vacation";
     document.getElementById("exceptionTitle").value=ex.title || "";
     document.getElementById("exceptionNote").value=ex.note || "";
     document.getElementById("exceptionSaveBtn").textContent="Salva modifica";
@@ -2633,9 +2676,52 @@ function renderDailySummary(){
     openModal(index);
   }
 
+
+  function renderDayExceptionBanner(){
+    const box=document.getElementById("dayExceptionBanner");
+    if(!box) return;
+
+    const dayIso=iso(dateForDay(selectedDay));
+    const matches=(calendarExceptions||[]).filter(ex=>
+      ex.start_date<=dayIso && ex.end_date>=dayIso
+    );
+
+    if(!matches.length){
+      box.innerHTML="";
+      return;
+    }
+
+    box.innerHTML=matches.map(ex=>{
+      let title="";
+      let detail="";
+
+      if(ex.exception_type==="holiday"){
+        title=`🎉 Oggi · ${escapeHtml(ex.title)}`;
+        detail=`Festività programmata · ${formatDateIt(dayIso)}`;
+      }else if(ex.exception_type==="gym_closed"){
+        title=`🏢 Chiusura palestra · ${exceptionGymLabel(ex.gym_code)}`;
+        detail=`${escapeHtml(ex.title)} · ${formatDateIt(dayIso)}`;
+      }else{
+        const reason=absenceReasonLabel(ex.absence_reason);
+        const icon=absenceReasonIcon(ex.absence_reason);
+        title=`${icon} Assenza Olga · ${reason || "Motivo non specificato"}`;
+        detail=`${escapeHtml(ex.title)} · ${formatDateIt(dayIso)}`;
+      }
+
+      const note=ex.note ? `<div><small>${escapeHtml(ex.note)}</small></div>` : "";
+
+      return `<div class="dayExceptionNotice ${ex.exception_type}">
+        <strong>${title}</strong>
+        <small>${detail}</small>
+        ${note}
+      </div>`;
+    }).join("");
+  }
+
   function render(){
  renderWeekLabel();
  renderDays();
+ renderDayExceptionBanner();
  renderLessons();
  renderSummary();
   renderDailySummary();
