@@ -1009,7 +1009,7 @@ async function syncToSupabase(key,data,row){
 
     const { data: existing, error: findError } = await supabaseClient
       .from("lessons")
-      .select("id,status,note,substituted_by")
+      .select("id,status,note,substituted_by,status_source,calendar_exception_id")
       .eq("lesson_date", lessonDate)
       .eq("start_time", startTime)
       .eq("gym_code", gymCode)
@@ -1028,6 +1028,8 @@ async function syncToSupabase(key,data,row){
       status: statusToDb(data.status),
       note: String(data.note || "").trim(),
       substituted_by: String(data.sub || "").trim(),
+      status_source: "manual",
+      calendar_exception_id: null,
       modified_at: new Date().toISOString()
     };
 
@@ -2371,9 +2373,165 @@ function renderDailySummary(){
       renderDayExceptionBanner();
       renderDays();
       syncExceptionEditUI();
+
+      await applyCalendarExceptionsToLessons();
+      await loadWeekFromSupabase();
     }catch(err){
       console.error("Errore caricamento ferie/chiusure:",err);
       if(target) target.innerHTML='<div class="exceptionEmpty">Impossibile caricare ferie e chiusure.</div>';
+    }
+  }
+
+
+  function calendarExceptionStatus(ex){
+    if(ex.exception_type==="holiday") return "holiday_closed";
+    if(ex.exception_type==="gym_closed") return "gym_cancelled";
+    if(ex.exception_type==="olga_vacation") return "olga_absent";
+    return "pending";
+  }
+
+  function dbGymCode(appGym){
+    return appGym==="A&R" ? "AR" : appGym;
+  }
+
+  function calendarExceptionAppliesToRow(ex,row,dateIso){
+    if(dateIso < ex.start_date || dateIso > ex.end_date) return false;
+    if(ex.exception_type==="gym_closed"){
+      return dbGymCode(row[3])===ex.gym_code;
+    }
+    return true;
+  }
+
+  function exceptionPriority(ex){
+    if(ex.exception_type==="olga_vacation") return 30;
+    if(ex.exception_type==="gym_closed") return 20;
+    if(ex.exception_type==="holiday") return 10;
+    return 0;
+  }
+
+  function plannedLessonsForExceptionRange(){
+    if(!calendarExceptions.length) return [];
+
+    const minDate=calendarExceptions.reduce((m,e)=>!m || e.start_date<m ? e.start_date : m,"");
+    const maxDate=calendarExceptions.reduce((m,e)=>!m || e.end_date>m ? e.end_date : m,"");
+    if(!minDate || !maxDate) return [];
+
+    const out=[];
+    const d=new Date(minDate+"T12:00:00");
+    const end=new Date(maxDate+"T12:00:00");
+
+    while(d<=end){
+      const weekday=d.getDay();
+      if(weekday>=1 && weekday<=5){
+        const dayIso=iso(d);
+        schedule.filter(r=>r[0]===weekday).forEach(row=>{
+          const candidates=calendarExceptions
+            .filter(ex=>calendarExceptionAppliesToRow(ex,row,dayIso))
+            .sort((a,b)=>exceptionPriority(b)-exceptionPriority(a));
+
+          if(candidates.length){
+            out.push({dayIso,row,exception:candidates[0]});
+          }
+        });
+      }
+      d.setDate(d.getDate()+1);
+    }
+    return out;
+  }
+
+  async function releaseCalendarExceptionLessons(exceptionId){
+    if(!exceptionId) return;
+
+    const {error}=await supabaseClient
+      .from("lessons")
+      .delete()
+      .eq("status_source","calendar_exception")
+      .eq("calendar_exception_id",exceptionId);
+
+    if(error) throw error;
+  }
+
+  async function applyCalendarExceptionsToLessons(){
+    if(!calendarExceptions.length) return;
+
+    const planned=plannedLessonsForExceptionRange();
+    if(!planned.length) return;
+
+    const start=planned.reduce((m,x)=>!m || x.dayIso<m ? x.dayIso : m,"");
+    const end=planned.reduce((m,x)=>!m || x.dayIso>m ? x.dayIso : m,"");
+
+    const {data:existingRows,error:readError}=await supabaseClient
+      .from("lessons")
+      .select("id,lesson_date,start_time,gym_code,lesson_name,status,note,substituted_by,status_source,calendar_exception_id")
+      .gte("lesson_date",start)
+      .lte("lesson_date",end);
+
+    if(readError) throw readError;
+
+    const existingMap=new Map();
+    (existingRows||[]).forEach(item=>{
+      const k=[
+        item.lesson_date,
+        String(item.start_time).slice(0,5),
+        item.gym_code,
+        item.lesson_name
+      ].join("|");
+      if(!existingMap.has(k)) existingMap.set(k,item);
+    });
+
+    for(const item of planned){
+      const row=item.row;
+      const ex=item.exception;
+      const gym=dbGymCode(row[3]);
+      const key=[item.dayIso,row[1],gym,row[4]].join("|");
+      const existing=existingMap.get(key);
+      const wantedStatus=calendarExceptionStatus(ex);
+
+      // Olga o Max hanno sempre precedenza: una modifica manuale non viene sovrascritta.
+      if(existing && (existing.status_source||"manual")==="manual"){
+        continue;
+      }
+
+      const payload={
+        lesson_date:item.dayIso,
+        start_time:row[1],
+        end_time:row[2],
+        gym_code:gym,
+        lesson_name:row[4],
+        minutes:row[5],
+        price:row[6],
+        status:wantedStatus,
+        note:"",
+        substituted_by:"",
+        status_source:"calendar_exception",
+        calendar_exception_id:ex.id,
+        modified_at:new Date().toISOString()
+      };
+
+      if(existing){
+        const unchanged=
+          existing.status===wantedStatus &&
+          existing.status_source==="calendar_exception" &&
+          existing.calendar_exception_id===ex.id;
+
+        if(unchanged) continue;
+
+        const {error}=await supabaseClient
+          .from("lessons")
+          .update(payload)
+          .eq("id",existing.id);
+
+        if(error) throw error;
+      }else{
+        const {data:inserted,error}=await supabaseClient
+          .from("lessons")
+          .insert([payload])
+          .select("id,lesson_date,start_time,gym_code,lesson_name,status,status_source,calendar_exception_id")
+          .single();
+
+        if(error) throw error;
+        existingMap.set(key,inserted);
+      }
     }
   }
 
@@ -2457,11 +2615,15 @@ function renderDailySummary(){
     };
 
     try{
-      if(editingExceptionId){
+      const previousId=editingExceptionId;
+
+      if(previousId){
+        await releaseCalendarExceptionLessons(previousId);
+
         const {error}=await supabaseClient
           .from("calendar_exceptions")
           .update(payload)
-          .eq("id",editingExceptionId);
+          .eq("id",previousId);
         if(error) throw error;
       }else{
         const {error}=await supabaseClient
@@ -2503,6 +2665,8 @@ function renderDailySummary(){
     if(!confirm(`Vuoi davvero eliminare "${ex.title}"?`)) return;
 
     try{
+      await releaseCalendarExceptionLessons(id);
+
       const {error}=await supabaseClient
         .from("calendar_exceptions")
         .delete()
@@ -3102,7 +3266,7 @@ async function loadWeekFromSupabase(){
 
     const { data, error } = await supabaseClient
       .from("lessons")
-      .select("id,lesson_date,start_time,gym_code,lesson_name,status,note,substituted_by,modified_at")
+      .select("id,lesson_date,start_time,gym_code,lesson_name,status,note,substituted_by,modified_at,status_source,calendar_exception_id")
       .gte("lesson_date", start)
       .lte("lesson_date", end);
 
