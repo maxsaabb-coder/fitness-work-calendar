@@ -338,6 +338,40 @@ footer{
   padding:25px
 }
 
+.topTools{max-width:850px;margin:12px auto 0;padding:0 14px;display:flex;justify-content:flex-end}
+.exceptionOpenBtn{border:0;background:white;color:#111827;border-radius:12px;padding:11px 14px;box-shadow:0 1px 5px #0002;font-weight:700;cursor:pointer}
+.exceptionScreen{position:fixed;inset:0;z-index:5000;background:#f3f4f6;display:none;overflow-y:auto}
+.exceptionScreen.show{display:block}
+.exceptionScreenHeader{position:sticky;top:0;z-index:2;background:#111827;color:white;padding:15px 16px;box-shadow:0 2px 8px #0003}
+.exceptionScreenHeaderInner{max-width:850px;margin:auto;display:flex;align-items:center;gap:12px}
+.exceptionBack{border:0;background:#fff;color:#111827;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
+.exceptionScreenHeader h2{margin:0;font-size:20px}
+.exceptionWrap{max-width:850px;margin:auto;padding:16px}
+.exceptionIntro{background:white;padding:14px;border-radius:14px;box-shadow:0 1px 5px #0002;margin-bottom:14px}
+.exceptionChoices{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:14px}
+.exceptionChoice{border:1px solid #d1d5db;background:white;border-radius:13px;padding:14px 8px;font-weight:700;cursor:pointer}
+.exceptionChoice.active{border-color:#111827;background:#111827;color:white}
+.exceptionForm{background:white;border-radius:14px;box-shadow:0 1px 5px #0002;padding:14px;margin-bottom:16px}
+.exceptionFormGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.exceptionForm label{display:block;font-size:12px;font-weight:700;color:#4b5563;margin-bottom:5px}
+.exceptionForm input,.exceptionForm select,.exceptionForm textarea{width:100%;padding:10px;border:1px solid #d1d5db;border-radius:10px;font:inherit;background:white}
+.exceptionForm textarea{min-height:70px;resize:vertical}
+.exceptionForm .full{grid-column:1/-1}
+.exceptionSave{width:100%;margin-top:12px;border:0;border-radius:11px;background:#047857;color:white;font-weight:800;padding:12px;cursor:pointer}
+.exceptionListTitle{margin:20px 2px 10px}
+.exceptionItem{background:white;border-radius:14px;box-shadow:0 1px 5px #0002;padding:13px;margin-bottom:10px;border-left:5px solid #64748b}
+.exceptionItem.holiday{border-left-color:#7c3aed}
+.exceptionItem.gym_closed{border-left-color:#dc2626}
+.exceptionItem.olga_vacation{border-left-color:#f59e0b}
+.exceptionItemTitle{font-weight:800}
+.exceptionItemMeta{font-size:13px;color:#6b7280;margin-top:4px}
+.exceptionItemNote{font-size:13px;margin-top:7px}
+.exceptionActions{display:flex;gap:8px;margin-top:10px}
+.exceptionActions button{border:1px solid #d1d5db;background:white;border-radius:9px;padding:8px 10px;font-weight:700;cursor:pointer}
+.exceptionActions .danger{color:#b91c1c}
+.exceptionEmpty{padding:20px;text-align:center;color:#6b7280;background:white;border-radius:14px}
+@media(max-width:600px){.exceptionChoices{grid-template-columns:1fr}.exceptionFormGrid{grid-template-columns:1fr}.exceptionForm .full{grid-column:auto}.topTools{justify-content:stretch}.exceptionOpenBtn{width:100%}}
+
 .modal{
   display:none;
   position:fixed;
@@ -405,6 +439,10 @@ footer{
 <h1>Calendario Olga</h1>
 <p>Lezioni · presenze · compensi</p>
 </header>
+
+<div class="topTools">
+  <button class="exceptionOpenBtn" onclick="openExceptionsScreen()">📅 Ferie e chiusure</button>
+</div>
 
 <main>
 
@@ -512,6 +550,52 @@ footer{
 
 <footer>Fitness Work Calendar · Olga</footer>
 
+
+<div id="exceptionsScreen" class="exceptionScreen" aria-hidden="true">
+  <div class="exceptionScreenHeader">
+    <div class="exceptionScreenHeaderInner">
+      <button class="exceptionBack" onclick="closeExceptionsScreen()">← Torna al calendario</button>
+      <h2>Ferie e chiusure</h2>
+    </div>
+  </div>
+
+  <div class="exceptionWrap">
+    <div class="exceptionIntro">
+      Gestisci qui <b>festività</b>, <b>chiusure di una palestra</b> e <b>ferie di Olga</b>.
+    </div>
+
+    <div class="exceptionChoices">
+      <button id="exceptionTypeHoliday" class="exceptionChoice active" onclick="setExceptionType('holiday')">🎉 Festività</button>
+      <button id="exceptionTypeGym" class="exceptionChoice" onclick="setExceptionType('gym_closed')">🏢 Chiusura palestra</button>
+      <button id="exceptionTypeVacation" class="exceptionChoice" onclick="setExceptionType('olga_vacation')">🏖️ Ferie Olga</button>
+    </div>
+
+    <div id="exceptionFormBox" class="exceptionForm">
+      <div class="exceptionFormGrid">
+        <div><label>Dal</label><input id="exceptionStart" type="date"></div>
+        <div><label>Al</label><input id="exceptionEnd" type="date"></div>
+
+        <div id="exceptionGymWrap" style="display:none">
+          <label>Palestra</label>
+          <select id="exceptionGym">
+            <option value="AR">A&R</option>
+            <option value="MAX">MAX</option>
+            <option value="TN">TN</option>
+            <option value="STSM">STSM</option>
+          </select>
+        </div>
+
+        <div class="full"><label>Descrizione</label><input id="exceptionTitle" type="text" placeholder="Es. Natale, Chiusura estiva, Ferie agosto"></div>
+        <div class="full"><label>Nota facoltativa</label><textarea id="exceptionNote" placeholder="Eventuali dettagli"></textarea></div>
+      </div>
+      <button id="exceptionSaveBtn" class="exceptionSave" onclick="saveCalendarException()">Salva festività</button>
+    </div>
+
+    <h3 class="exceptionListTitle">Eventi programmati</h3>
+    <div id="exceptionsList"></div>
+  </div>
+</div>
+
 <div class="modal" id="modal">
 <div class="panel">
 <h3 id="modalTitle">Aggiorna lezione</h3>
@@ -594,6 +678,9 @@ let currentWeek=getMonday(new Date());
   let summaryYear = new Date().getFullYear();
 let selected=null;
 let weekNoteAuditMap = new Map();
+let calendarExceptions = [];
+let exceptionTypeSelected = "holiday";
+let editingExceptionId = null;
 
 const standardTravelByWeekday = {
   1:{name:"Lunedì",km:5.6,trips:6,walk:1.6},
@@ -913,6 +1000,7 @@ function renderDays(){
     document.getElementById("loginBox").style.display = "none";
     await loadWeekFromSupabase();
     await renderLessonHistory();
+    await loadCalendarExceptions();
   }
 
   async function checkSession() {
@@ -923,6 +1011,7 @@ function renderDays(){
       isReadOnly = data.session.user?.email === "maxsaabb@gmail.com";
       await refreshAdminStatus();
       await renderLessonHistory();
+      await loadCalendarExceptions();
     } else {
       document.getElementById("loginBox").style.display = "block";
       isReadOnly = false;
@@ -969,6 +1058,8 @@ function renderDays(){
     if (badge) badge.style.display = active ? "block" : "none";
     if (allDoneBtn) allDoneBtn.style.display = (maxAccount && !active) ? "none" : "";
     if (kmCostEditBtn) kmCostEditBtn.style.display = (maxAccount && !active) ? "none" : "";
+    syncExceptionEditUI();
+    if(document.getElementById("exceptionsScreen")?.classList.contains("show")) renderCalendarExceptions();
   }
 
   function formatAdminLockTime(value){
@@ -2018,6 +2109,227 @@ function renderDailySummary(){
   document.getElementById("money").textContent="€"+money;
   document.getElementById("notDone").textContent=notDone;
 }
+
+
+  function exceptionTypeLabel(type){
+    if(type==="holiday") return "Festività";
+    if(type==="gym_closed") return "Chiusura palestra";
+    if(type==="olga_vacation") return "Ferie Olga";
+    return type || "";
+  }
+
+  function exceptionGymLabel(code){
+    return code==="AR" ? "A&R" : (code || "");
+  }
+
+  function canEditExceptions(){
+    return canEditLessons();
+  }
+
+  function openExceptionsScreen(){
+    const screen=document.getElementById("exceptionsScreen");
+    if(!screen) return;
+    screen.classList.add("show");
+    screen.setAttribute("aria-hidden","false");
+    document.body.style.overflow="hidden";
+    resetExceptionForm();
+    loadCalendarExceptions();
+  }
+
+  function closeExceptionsScreen(){
+    const screen=document.getElementById("exceptionsScreen");
+    if(!screen) return;
+    screen.classList.remove("show");
+    screen.setAttribute("aria-hidden","true");
+    document.body.style.overflow="";
+    editingExceptionId=null;
+  }
+
+  function setExceptionType(type){
+    exceptionTypeSelected=type;
+    const ids={holiday:"exceptionTypeHoliday",gym_closed:"exceptionTypeGym",olga_vacation:"exceptionTypeVacation"};
+    Object.entries(ids).forEach(([t,id])=>{
+      const el=document.getElementById(id);
+      if(el) el.classList.toggle("active",t===type);
+    });
+    const gymWrap=document.getElementById("exceptionGymWrap");
+    if(gymWrap) gymWrap.style.display=type==="gym_closed"?"":"none";
+    const btn=document.getElementById("exceptionSaveBtn");
+    if(btn && !editingExceptionId){
+      btn.textContent=type==="holiday"?"Salva festività":type==="gym_closed"?"Salva chiusura palestra":"Salva ferie Olga";
+    }
+  }
+
+  function resetExceptionForm(){
+    editingExceptionId=null;
+    setExceptionType("holiday");
+    const today=iso(new Date());
+    document.getElementById("exceptionStart").value=today;
+    document.getElementById("exceptionEnd").value=today;
+    document.getElementById("exceptionGym").value="AR";
+    document.getElementById("exceptionTitle").value="";
+    document.getElementById("exceptionNote").value="";
+    document.getElementById("exceptionSaveBtn").textContent="Salva festività";
+    syncExceptionEditUI();
+  }
+
+  function syncExceptionEditUI(){
+    const form=document.getElementById("exceptionFormBox");
+    if(form) form.style.display=canEditExceptions()?"":"none";
+  }
+
+  async function loadCalendarExceptions(){
+    const target=document.getElementById("exceptionsList");
+    if(target) target.innerHTML='<div class="exceptionEmpty">Caricamento…</div>';
+
+    try{
+      const {data,error}=await supabaseClient
+        .from("calendar_exceptions")
+        .select("id,exception_type,start_date,end_date,gym_code,title,note,created_by_email,created_at,modified_at")
+        .order("start_date",{ascending:true});
+
+      if(error) throw error;
+
+      calendarExceptions=data || [];
+      renderCalendarExceptions();
+      syncExceptionEditUI();
+    }catch(err){
+      console.error("Errore caricamento ferie/chiusure:",err);
+      if(target) target.innerHTML='<div class="exceptionEmpty">Impossibile caricare ferie e chiusure.</div>';
+    }
+  }
+
+  function renderCalendarExceptions(){
+    const target=document.getElementById("exceptionsList");
+    if(!target) return;
+
+    if(!calendarExceptions.length){
+      target.innerHTML='<div class="exceptionEmpty">Nessun evento programmato.</div>';
+      return;
+    }
+
+    const editable=canEditExceptions();
+
+    target.innerHTML=calendarExceptions.map(ex=>{
+      const period=ex.start_date===ex.end_date
+        ? formatDateIt(ex.start_date)
+        : `${formatDateIt(ex.start_date)} → ${formatDateIt(ex.end_date)}`;
+
+      const gym=ex.exception_type==="gym_closed" && ex.gym_code
+        ? ` · ${exceptionGymLabel(ex.gym_code)}`
+        : "";
+
+      const note=ex.note ? `<div class="exceptionItemNote">${escapeHtml(ex.note)}</div>` : "";
+
+      const actions=editable
+        ? `<div class="exceptionActions">
+             <button onclick="editCalendarException('${ex.id}')">Modifica</button>
+             <button class="danger" onclick="deleteCalendarException('${ex.id}')">Elimina</button>
+           </div>`
+        : "";
+
+      return `<div class="exceptionItem ${ex.exception_type}">
+        <div class="exceptionItemTitle">${escapeHtml(ex.title)}</div>
+        <div class="exceptionItemMeta">${exceptionTypeLabel(ex.exception_type)}${gym} · ${period}</div>
+        ${note}
+        ${actions}
+      </div>`;
+    }).join("");
+  }
+
+  async function saveCalendarException(){
+    if(!canEditExceptions()){
+      alert("Per modificare ferie e chiusure devi avere i permessi di modifica.");
+      return;
+    }
+
+    const start=document.getElementById("exceptionStart").value;
+    const end=document.getElementById("exceptionEnd").value;
+    const gym=document.getElementById("exceptionGym").value;
+    const title=document.getElementById("exceptionTitle").value.trim();
+    const note=document.getElementById("exceptionNote").value.trim();
+
+    if(!start || !end){
+      alert("Inserisci la data di inizio e la data di fine.");
+      return;
+    }
+    if(end < start){
+      alert("La data finale non può essere precedente alla data iniziale.");
+      return;
+    }
+    if(!title){
+      alert("Inserisci una descrizione.");
+      return;
+    }
+
+    const payload={
+      exception_type:exceptionTypeSelected,
+      start_date:start,
+      end_date:end,
+      gym_code:exceptionTypeSelected==="gym_closed" ? gym : null,
+      title,
+      note:note || null,
+      modified_at:new Date().toISOString()
+    };
+
+    try{
+      if(editingExceptionId){
+        const {error}=await supabaseClient
+          .from("calendar_exceptions")
+          .update(payload)
+          .eq("id",editingExceptionId);
+        if(error) throw error;
+      }else{
+        const {error}=await supabaseClient
+          .from("calendar_exceptions")
+          .insert(payload);
+        if(error) throw error;
+      }
+
+      resetExceptionForm();
+      await loadCalendarExceptions();
+    }catch(err){
+      console.error("Errore salvataggio ferie/chiusure:",err);
+      alert("Non è stato possibile salvare l'evento.");
+    }
+  }
+
+  function editCalendarException(id){
+    if(!canEditExceptions()) return;
+    const ex=calendarExceptions.find(x=>x.id===id);
+    if(!ex) return;
+
+    editingExceptionId=id;
+    setExceptionType(ex.exception_type);
+    document.getElementById("exceptionStart").value=ex.start_date;
+    document.getElementById("exceptionEnd").value=ex.end_date;
+    document.getElementById("exceptionGym").value=ex.gym_code || "AR";
+    document.getElementById("exceptionTitle").value=ex.title || "";
+    document.getElementById("exceptionNote").value=ex.note || "";
+    document.getElementById("exceptionSaveBtn").textContent="Salva modifica";
+    document.getElementById("exceptionFormBox").scrollIntoView({behavior:"smooth",block:"start"});
+  }
+
+  async function deleteCalendarException(id){
+    if(!canEditExceptions()) return;
+    const ex=calendarExceptions.find(x=>x.id===id);
+    if(!ex) return;
+
+    if(!confirm(`Vuoi davvero eliminare "${ex.title}"?`)) return;
+
+    try{
+      const {error}=await supabaseClient
+        .from("calendar_exceptions")
+        .delete()
+        .eq("id",id);
+
+      if(error) throw error;
+      await loadCalendarExceptions();
+    }catch(err){
+      console.error("Errore eliminazione ferie/chiusure:",err);
+      alert("Non è stato possibile eliminare l'evento.");
+    }
+  }
 
   function canEditLessons(){
     return !isReadOnly || (adminMode && Date.now() < adminUntil);
