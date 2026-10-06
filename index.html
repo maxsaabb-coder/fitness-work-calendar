@@ -3275,6 +3275,13 @@ async function loadWeekFromSupabase(){
     const rows=data || [];
     const idToKey=new Map();
 
+    // Prima azzeriamo dalla cache locale le lezioni della settimana corrente.
+    // Così, se un evento automatico viene cancellato e le relative righe
+    // vengono rimosse da Supabase, lo stato non resta "incastrato" nel browser.
+    schedule.forEach(row => {
+      localStorage.removeItem("olga_"+keyFor(row));
+    });
+
     rows.forEach(item => {
       const appGymCode = item.gym_code === "AR" ? "A&R" : item.gym_code;
       const key = item.lesson_date+"_"+String(item.start_time).slice(0,5)+"_"+appGymCode+"_"+item.lesson_name;
