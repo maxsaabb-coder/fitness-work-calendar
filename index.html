@@ -3061,22 +3061,44 @@ function renderDailySummary(){
              s==="Chiusura / Festività";
     });
 
-    if(!missed.length){
-      box.innerHTML=`<div class="topMissedCard none">
-        <div class="topMissedTitle">Nessuna lezione saltata</div>
-        <div class="topMissedDetail">Giornata senza assenze registrate</div>
+    // Se ci sono lezioni non svolte, il riquadro rosso ha sempre la precedenza.
+    if(missed.length){
+      const totalMinutes=missed.reduce((sum,r)=>sum+Number(r[5]||0),0);
+      const hours=Math.floor(totalMinutes/60);
+      const minutes=totalMinutes%60;
+      const duration=hours>0 ? `${hours}h${minutes?` ${minutes}m`:""}` : `${minutes}m`;
+
+      box.innerHTML=`<div class="topMissedCard">
+        <div class="topMissedTitle">🔴 ${missed.length} ${missed.length===1?"lezione saltata":"lezioni saltate"}</div>
+        <div class="topMissedDetail">${duration} non svolte</div>
       </div>`;
       return;
     }
 
-    const totalMinutes=missed.reduce((sum,r)=>sum+Number(r[5]||0),0);
-    const hours=Math.floor(totalMinutes/60);
-    const minutes=totalMinutes%60;
-    const duration=hours>0 ? `${hours}h${minutes?` ${minutes}m`:""}` : `${minutes}m`;
+    const selectedDate=new Date(iso(dateForDay(selectedDay))+"T12:00:00");
+    const today=new Date();
+    const todayDate=new Date(today.getFullYear(),today.getMonth(),today.getDate(),12,0,0);
+    const selectedOnly=new Date(selectedDate.getFullYear(),selectedDate.getMonth(),selectedDate.getDate(),12,0,0);
 
-    box.innerHTML=`<div class="topMissedCard">
-      <div class="topMissedTitle">🔴 ${missed.length} ${missed.length===1?"lezione saltata":"lezioni saltate"}</div>
-      <div class="topMissedDetail">${duration} non svolte</div>
+    if(selectedOnly>todayDate){
+      box.innerHTML=`<div class="topMissedCard none">
+        <div class="topMissedTitle">Tutte le lezioni previste</div>
+        <div class="topMissedDetail">${rows.length} ${rows.length===1?"lezione prevista":"lezioni previste"} · Nessuna assenza registrata</div>
+      </div>`;
+      return;
+    }
+
+    if(selectedOnly.getTime()===todayDate.getTime()){
+      box.innerHTML=`<div class="topMissedCard none">
+        <div class="topMissedTitle">Lezioni in programma</div>
+        <div class="topMissedDetail">${rows.length} ${rows.length===1?"lezione prevista":"lezioni previste"} · Nessuna assenza registrata</div>
+      </div>`;
+      return;
+    }
+
+    box.innerHTML=`<div class="topMissedCard none">
+      <div class="topMissedTitle">Nessuna lezione saltata</div>
+      <div class="topMissedDetail">Tutte le lezioni risultano regolari</div>
     </div>`;
   }
 
