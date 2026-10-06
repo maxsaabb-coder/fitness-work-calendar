@@ -80,12 +80,29 @@ main{
   min-width:82px;
   border:0;
   background:white;
-  padding:10px 7px;
+  padding:10px 7px 16px;
   border-radius:10px;
   font-weight:600;
-  cursor:pointer
+  cursor:pointer;
+  position:relative
 }
 .daybtn.active{background:#111827;color:white}
+.dayDots{
+  position:absolute;
+  right:7px;
+  bottom:5px;
+  display:flex;
+  align-items:center;
+  gap:4px
+}
+.dayDot{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  display:block
+}
+.dayDot.event{background:#7c3aed}
+.dayDot.missed{background:#ef4444}
 
 .daytitle{
   font-size:20px;
@@ -338,7 +355,61 @@ footer{
   padding:25px
 }
 
-.topTools{max-width:850px;margin:12px auto 0;padding:0 14px;display:flex;justify-content:flex-end}
+.topTools{
+  max-width:850px;
+  margin:12px auto 0;
+  padding:0 14px;
+  min-height:64px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:12px
+}
+.topEventSlot{
+  min-height:54px;
+  display:flex;
+  align-items:center
+}
+.topEventSlot:empty{
+  visibility:hidden
+}
+.topEventCard{
+  width:100%;
+  min-height:54px;
+  box-sizing:border-box;
+  border-radius:12px;
+  padding:8px 12px;
+  background:#faf5ff;
+  border:1px solid #c4b5fd;
+  border-left:5px solid #7c3aed;
+  display:flex;
+  flex-direction:column;
+  justify-content:center
+}
+.topEventCard.gym_closed{
+  background:#fef2f2;
+  border-color:#fecaca;
+  border-left-color:#dc2626
+}
+.topEventCard.olga_vacation{
+  background:#fffbeb;
+  border-color:#fde68a;
+  border-left-color:#f59e0b
+}
+.topEventTitle{
+  font-weight:800;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
+.topEventDetail{
+  margin-top:2px;
+  font-size:12px;
+  color:#6b7280;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis
+}
 .exceptionOpenBtn{border:0;background:white;color:#111827;border-radius:12px;padding:11px 14px;box-shadow:0 1px 5px #0002;font-weight:700;cursor:pointer}
 .exceptionScreen{position:fixed;inset:0;z-index:5000;background:#f3f4f6;display:none;overflow-y:auto}
 .exceptionScreen.show{display:block}
@@ -370,14 +441,16 @@ footer{
 .exceptionActions button{border:1px solid #d1d5db;background:white;border-radius:9px;padding:8px 10px;font-weight:700;cursor:pointer}
 .exceptionActions .danger{color:#b91c1c}
 .exceptionEmpty{padding:20px;text-align:center;color:#6b7280;background:white;border-radius:14px}
-.dayExceptionBanner{max-width:850px;margin:12px auto 0;padding:0 14px}
-.dayExceptionNotice{background:#fff7ed;border:1px solid #fdba74;border-left:5px solid #f59e0b;border-radius:12px;padding:12px 14px;margin-bottom:8px}
-.dayExceptionNotice.holiday{background:#faf5ff;border-color:#c4b5fd;border-left-color:#7c3aed}
-.dayExceptionNotice.gym_closed{background:#fef2f2;border-color:#fecaca;border-left-color:#dc2626}
-.dayExceptionNotice.olga_vacation{background:#fffbeb;border-color:#fde68a;border-left-color:#f59e0b}
-.dayExceptionNotice strong{display:block;margin-bottom:3px}
-.dayExceptionNotice small{color:#6b7280}
-@media(max-width:600px){.exceptionChoices{grid-template-columns:1fr}.exceptionFormGrid{grid-template-columns:1fr}.exceptionForm .full{grid-column:auto}.topTools{justify-content:stretch}.exceptionOpenBtn{width:100%}}
+@media(max-width:600px){
+  .exceptionChoices{grid-template-columns:1fr}
+  .exceptionFormGrid{grid-template-columns:1fr}
+  .exceptionForm .full{grid-column:auto}
+  .topTools{grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:0 10px;min-height:62px}
+  .exceptionOpenBtn{width:auto;padding:10px 11px;font-size:12px}
+  .topEventCard{padding:7px 9px}
+  .topEventTitle{font-size:13px}
+  .topEventDetail{font-size:11px}
+}
 
 .modal{
   display:none;
@@ -448,6 +521,7 @@ footer{
 </header>
 
 <div class="topTools">
+  <div id="topEventSlot" class="topEventSlot"></div>
   <button class="exceptionOpenBtn" onclick="openExceptionsScreen()">📅 Ferie e chiusure</button>
 </div>
 
@@ -458,8 +532,6 @@ footer{
 <div id="weekLabel"></div>
 <button onclick="changeWeek(7)">›</button>
 </div>
-
-<div id="dayExceptionBanner" class="dayExceptionBanner"></div>
 
 <button class="today" onclick="goToday()">Torna a oggi</button>
 
@@ -961,9 +1033,29 @@ function fmtDate(d){
 function renderDays(){
  let html="";
  for(let i=1;i<=5;i++){
-   let d=dateForDay(i);
+   const d=dateForDay(i);
+   const dayIso=iso(d);
+
+   const hasEvent=(calendarExceptions||[]).some(ex=>
+     ex.start_date<=dayIso && ex.end_date>=dayIso
+   );
+
+   const hasMissed=schedule
+     .filter(r=>r[0]===i)
+     .some(r=>{
+       const s=getData(keyFor(r)).status;
+       return s==="Annullata palestra" || s==="Assenza Olga";
+     });
+
+   const dots=(hasEvent || hasMissed)
+     ? `<span class="dayDots">
+          ${hasEvent?'<span class="dayDot event" title="Evento programmato"></span>':""}
+          ${hasMissed?'<span class="dayDot missed" title="Lezione non svolta"></span>':""}
+        </span>`
+     : "";
+
    html+=`<button class="daybtn ${i===selectedDay?"active":""}"
-   onclick="selectedDay=${i};render()">${dayNames[i]}<br><small>${fmtDate(d)}</small></button>`;
+   onclick="selectedDay=${i};render()">${dayNames[i]}<br><small>${fmtDate(d)}</small>${dots}</button>`;
  }
  document.getElementById("days").innerHTML=html;
 }
@@ -2228,6 +2320,7 @@ function renderDailySummary(){
       calendarExceptions=data || [];
       renderCalendarExceptions();
       renderDayExceptionBanner();
+      renderDays();
       syncExceptionEditUI();
     }catch(err){
       console.error("Errore caricamento ferie/chiusure:",err);
@@ -2678,7 +2771,7 @@ function renderDailySummary(){
 
 
   function renderDayExceptionBanner(){
-    const box=document.getElementById("dayExceptionBanner");
+    const box=document.getElementById("topEventSlot");
     if(!box) return;
 
     const dayIso=iso(dateForDay(selectedDay));
@@ -2691,31 +2784,42 @@ function renderDailySummary(){
       return;
     }
 
-    box.innerHTML=matches.map(ex=>{
-      let title="";
-      let detail="";
+    // Nella fascia superiore mostriamo l'evento principale del giorno.
+    // Se ce ne sono più di uno, indichiamo anche quanti altri eventi esistono.
+    const ex=matches[0];
+    let title="";
+    let detail="";
 
-      if(ex.exception_type==="holiday"){
-        title=`🎉 Oggi · ${escapeHtml(ex.title)}`;
-        detail=`Festività programmata · ${formatDateIt(dayIso)}`;
-      }else if(ex.exception_type==="gym_closed"){
-        title=`🏢 Chiusura palestra · ${exceptionGymLabel(ex.gym_code)}`;
-        detail=`${escapeHtml(ex.title)} · ${formatDateIt(dayIso)}`;
+    if(ex.exception_type==="holiday"){
+      title=`🎉 ${escapeHtml(ex.title)}`;
+      detail=`Festività programmata · ${formatDateIt(dayIso)}`;
+    }else if(ex.exception_type==="gym_closed"){
+      title=`🏢 ${escapeHtml(ex.title)}`;
+      detail=`Chiusura palestra · ${exceptionGymLabel(ex.gym_code)} · ${formatDateIt(dayIso)}`;
+    }else{
+      const reason=absenceReasonLabel(ex.absence_reason);
+      const icon=absenceReasonIcon(ex.absence_reason);
+      title=`${icon} ${escapeHtml(ex.title)}`;
+
+      if(ex.absence_reason==="illness"){
+        detail=`Assenza per malattia · ${formatDateIt(dayIso)}`;
+      }else if(ex.absence_reason==="course"){
+        detail=`Assenza programmata · Corso / formazione · ${formatDateIt(dayIso)}`;
+      }else if(ex.absence_reason==="vacation"){
+        detail=`Assenza programmata · Ferie · ${formatDateIt(dayIso)}`;
       }else{
-        const reason=absenceReasonLabel(ex.absence_reason);
-        const icon=absenceReasonIcon(ex.absence_reason);
-        title=`${icon} Assenza Olga · ${reason || "Motivo non specificato"}`;
-        detail=`${escapeHtml(ex.title)} · ${formatDateIt(dayIso)}`;
+        detail=`Assenza Olga · ${reason || "Motivo non specificato"} · ${formatDateIt(dayIso)}`;
       }
+    }
 
-      const note=ex.note ? `<div><small>${escapeHtml(ex.note)}</small></div>` : "";
+    if(matches.length>1){
+      detail+=` · +${matches.length-1} altro${matches.length>2?" eventi":" evento"}`;
+    }
 
-      return `<div class="dayExceptionNotice ${ex.exception_type}">
-        <strong>${title}</strong>
-        <small>${detail}</small>
-        ${note}
-      </div>`;
-    }).join("");
+    box.innerHTML=`<div class="topEventCard ${ex.exception_type}">
+      <div class="topEventTitle">${title}</div>
+      <div class="topEventDetail">${detail}</div>
+    </div>`;
   }
 
   function render(){
