@@ -361,30 +361,36 @@ footer{
   padding:0 14px;
   min-height:64px;
   display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  align-items:center;
-  gap:12px
+  grid-template-columns:1fr 1fr 1fr;
+  align-items:stretch;
+  gap:10px
 }
-.topEventSlot{
-  min-height:54px;
+.topEventSlot,.topMissedSlot{
+  min-width:0;
+  min-height:58px;
   display:flex;
-  align-items:center
+  align-items:stretch
 }
-.topEventSlot:empty{
-  visibility:hidden
-}
-.topEventCard{
+.topEventCard,.topMissedCard,.exceptionOpenBtn{
   width:100%;
-  min-height:54px;
+  min-height:58px;
   box-sizing:border-box;
   border-radius:12px;
   padding:8px 12px;
-  background:#faf5ff;
-  border:1px solid #c4b5fd;
-  border-left:5px solid #7c3aed;
   display:flex;
   flex-direction:column;
-  justify-content:center
+  justify-content:center;
+  text-align:left
+}
+.topEventCard{
+  background:#faf5ff;
+  border:1px solid #c4b5fd;
+  border-left:5px solid #7c3aed
+}
+.topEventCard.empty{
+  background:white;
+  border:1px solid #e5e7eb;
+  border-left:5px solid #e5e7eb
 }
 .topEventCard.gym_closed{
   background:#fef2f2;
@@ -396,13 +402,23 @@ footer{
   border-color:#fde68a;
   border-left-color:#f59e0b
 }
-.topEventTitle{
+.topMissedCard{
+  background:#fef2f2;
+  border:1px solid #fecaca;
+  border-left:5px solid #ef4444
+}
+.topMissedCard.none{
+  background:white;
+  border-color:#e5e7eb;
+  border-left-color:#e5e7eb
+}
+.topEventTitle,.topMissedTitle,.exceptionOpenTitle{
   font-weight:800;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis
 }
-.topEventDetail{
+.topEventDetail,.topMissedDetail,.exceptionOpenDetail{
   margin-top:2px;
   font-size:12px;
   color:#6b7280;
@@ -410,7 +426,15 @@ footer{
   overflow:hidden;
   text-overflow:ellipsis
 }
-.exceptionOpenBtn{border:0;background:white;color:#111827;border-radius:12px;padding:11px 14px;box-shadow:0 1px 5px #0002;font-weight:700;cursor:pointer}
+.exceptionOpenBtn{
+  border:1px solid #c4b5fd;
+  border-left:5px solid #7c3aed;
+  background:#faf5ff;
+  color:#111827;
+  cursor:pointer;
+  box-shadow:none
+}
+.exceptionOpenBtn:hover{background:#f3e8ff}
 .exceptionScreen{position:fixed;inset:0;z-index:5000;background:#f3f4f6;display:none;overflow-y:auto}
 .exceptionScreen.show{display:block}
 .exceptionScreenHeader{position:sticky;top:0;z-index:2;background:#111827;color:white;padding:15px 16px;box-shadow:0 2px 8px #0003}
@@ -445,11 +469,10 @@ footer{
   .exceptionChoices{grid-template-columns:1fr}
   .exceptionFormGrid{grid-template-columns:1fr}
   .exceptionForm .full{grid-column:auto}
-  .topTools{grid-template-columns:minmax(0,1fr) auto;gap:8px;padding:0 10px;min-height:62px}
-  .exceptionOpenBtn{width:auto;padding:10px 11px;font-size:12px}
-  .topEventCard{padding:7px 9px}
-  .topEventTitle{font-size:13px}
-  .topEventDetail{font-size:11px}
+  .topTools{grid-template-columns:1fr 1fr 1fr;gap:6px;padding:0 8px;min-height:58px}
+  .topEventCard,.topMissedCard,.exceptionOpenBtn{padding:7px 7px;min-height:56px}
+  .topEventTitle,.topMissedTitle,.exceptionOpenTitle{font-size:11px}
+  .topEventDetail,.topMissedDetail,.exceptionOpenDetail{font-size:9px}
 }
 
 .modal{
@@ -522,7 +545,11 @@ footer{
 
 <div class="topTools">
   <div id="topEventSlot" class="topEventSlot"></div>
-  <button class="exceptionOpenBtn" onclick="openExceptionsScreen()">📅 Ferie e chiusure</button>
+  <div id="topMissedSlot" class="topMissedSlot"></div>
+  <button class="exceptionOpenBtn" onclick="openExceptionsScreen()">
+    <span class="exceptionOpenTitle">📅 Ferie e chiusure</span>
+    <span class="exceptionOpenDetail">Gestisci eventi e assenze</span>
+  </button>
 </div>
 
 <main>
@@ -2780,12 +2807,13 @@ function renderDailySummary(){
     );
 
     if(!matches.length){
-      box.innerHTML="";
+      box.innerHTML=`<div class="topEventCard empty">
+        <div class="topEventTitle">Nessun evento</div>
+        <div class="topEventDetail">${formatDateIt(dayIso)}</div>
+      </div>`;
       return;
     }
 
-    // Nella fascia superiore mostriamo l'evento principale del giorno.
-    // Se ce ne sono più di uno, indichiamo anche quanti altri eventi esistono.
     const ex=matches[0];
     let title="";
     let detail="";
@@ -2797,7 +2825,6 @@ function renderDailySummary(){
       title=`🏢 ${escapeHtml(ex.title)}`;
       detail=`Chiusura palestra · ${exceptionGymLabel(ex.gym_code)} · ${formatDateIt(dayIso)}`;
     }else{
-      const reason=absenceReasonLabel(ex.absence_reason);
       const icon=absenceReasonIcon(ex.absence_reason);
       title=`${icon} ${escapeHtml(ex.title)}`;
 
@@ -2808,7 +2835,7 @@ function renderDailySummary(){
       }else if(ex.absence_reason==="vacation"){
         detail=`Assenza programmata · Ferie · ${formatDateIt(dayIso)}`;
       }else{
-        detail=`Assenza Olga · ${reason || "Motivo non specificato"} · ${formatDateIt(dayIso)}`;
+        detail=`Assenza Olga · ${formatDateIt(dayIso)}`;
       }
     }
 
@@ -2822,10 +2849,43 @@ function renderDailySummary(){
     </div>`;
   }
 
+  function renderTopMissedBox(){
+    const box=document.getElementById("topMissedSlot");
+    if(!box) return;
+
+    const rows=schedule.filter(r=>r[0]===selectedDay);
+    const missed=rows.filter(r=>{
+      const s=getData(keyFor(r)).status;
+      return s==="Annullata palestra" ||
+             s==="Assenza Olga" ||
+             s==="Sostituita" ||
+             s==="Chiusura / Festività";
+    });
+
+    if(!missed.length){
+      box.innerHTML=`<div class="topMissedCard none">
+        <div class="topMissedTitle">Nessuna lezione saltata</div>
+        <div class="topMissedDetail">Giornata senza assenze registrate</div>
+      </div>`;
+      return;
+    }
+
+    const totalMinutes=missed.reduce((sum,r)=>sum+Number(r[5]||0),0);
+    const hours=Math.floor(totalMinutes/60);
+    const minutes=totalMinutes%60;
+    const duration=hours>0 ? `${hours}h${minutes?` ${minutes}m`:""}` : `${minutes}m`;
+
+    box.innerHTML=`<div class="topMissedCard">
+      <div class="topMissedTitle">🔴 ${missed.length} ${missed.length===1?"lezione saltata":"lezioni saltate"}</div>
+      <div class="topMissedDetail">${duration} non svolte</div>
+    </div>`;
+  }
+
   function render(){
  renderWeekLabel();
  renderDays();
  renderDayExceptionBanner();
+ renderTopMissedBox();
  renderLessons();
  renderSummary();
   renderDailySummary();
