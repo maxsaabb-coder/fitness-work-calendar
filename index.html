@@ -195,6 +195,24 @@ main{
 .gymTotals{
   margin-top:20px
 }
+.summaryNav{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px
+}
+.summaryNavBtn{
+  width:44px;
+  height:44px;
+  border:none;
+  border-radius:12px;
+  font-size:22px;
+  background:white;
+  cursor:pointer;
+}
+.summaryNavBtn:hover{
+  background:#f3f4f6
+}
 .gymrow{
   display:flex;
   justify-content:space-between;
@@ -581,20 +599,24 @@ footer{
 <div id="lessons"></div>
 
 <div class="gymTotals">
-<h3 id="weekSummaryTitle" style="text-align:center">Riepilogo settimana</h3>
+<div class="summaryNav">
+  <button class="summaryNavBtn" onclick="changeWeek(-7)" aria-label="Settimana precedente">‹</button>
+  <h3 id="weekSummaryTitle" style="margin:0;text-align:center;flex:1">Riepilogo settimana</h3>
+  <button class="summaryNavBtn" onclick="changeWeek(7)" aria-label="Settimana successiva">›</button>
+</div>
 <div id="gymTotals"></div>
   <div class="gymTotals" style="margin-top:24px">
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-  <button onclick="changeMonth(-1)" style="width:44px;height:44px;border:none;border-radius:12px;font-size:22px">‹</button>
+  <div class="summaryNav">
+  <button class="summaryNavBtn" onclick="changeMonth(-1)" aria-label="Mese precedente">‹</button>
   <h3 id="monthTitle" style="margin:0;text-align:center;flex:1">Riepilogo mensile</h3>
-  <button onclick="changeMonth(1)" style="width:44px;height:44px;border:none;border-radius:12px;font-size:22px">›</button>
+  <button class="summaryNavBtn" onclick="changeMonth(1)" aria-label="Mese successivo">›</button>
 </div>
   <div id="monthTotals"></div>
     <div class="gymTotals" style="margin-top:24px">
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-    <button onclick="changeYear(-1)" style="width:44px;height:44px;border:none;border-radius:12px;font-size:22px">‹</button>
+  <div class="summaryNav">
+    <button class="summaryNavBtn" onclick="changeYear(-1)" aria-label="Anno precedente">‹</button>
     <h3 id="yearTitle" style="margin:0;text-align:center;flex:1">Riepilogo annuale</h3>
-    <button onclick="changeYear(1)" style="width:44px;height:44px;border:none;border-radius:12px;font-size:22px">›</button>
+    <button class="summaryNavBtn" onclick="changeYear(1)" aria-label="Anno successivo">›</button>
   </div>
   <div id="yearTotals"></div>
       <div class="gymTotals" style="margin-top:24px">
