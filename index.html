@@ -638,18 +638,30 @@ footer{
   </div>
 
   <div id="profitTabDay" class="profitTabPanel active">
-    <h3 id="profitTitle" style="text-align:center">Redditività per giorno</h3>
+    <div class="summaryNav">
+      <button class="summaryNavBtn" onclick="changeMonth(-1)" aria-label="Mese precedente nella redditività per giorno">‹</button>
+      <h3 id="profitTitle" style="margin:0;text-align:center;flex:1">Redditività per giorno</h3>
+      <button class="summaryNavBtn" onclick="changeMonth(1)" aria-label="Mese successivo nella redditività per giorno">›</button>
+    </div>
     <div id="kmCostBox" class="kmSettings"></div>
     <div id="dailyProfitability"></div>
   </div>
 
   <div id="profitTabGym" class="profitTabPanel">
-    <h3 id="gymProfitTitle" style="text-align:center">Redditività per palestra</h3>
+    <div class="summaryNav">
+      <button class="summaryNavBtn" onclick="changeMonth(-1)" aria-label="Mese precedente nella redditività per palestra">‹</button>
+      <h3 id="gymProfitTitle" style="margin:0;text-align:center;flex:1">Redditività per palestra</h3>
+      <button class="summaryNavBtn" onclick="changeMonth(1)" aria-label="Mese successivo nella redditività per palestra">›</button>
+    </div>
     <div id="gymProfitability"></div>
   </div>
 
   <div id="profitTabCharts" class="profitTabPanel">
-    <h3 id="economicChartsTitle" style="text-align:center">Grafici economici</h3>
+    <div class="summaryNav">
+      <button class="summaryNavBtn" onclick="changeMonth(-1)" aria-label="Mese precedente nei grafici economici">‹</button>
+      <h3 id="economicChartsTitle" style="margin:0;text-align:center;flex:1">Grafici economici</h3>
+      <button class="summaryNavBtn" onclick="changeMonth(1)" aria-label="Mese successivo nei grafici economici">›</button>
+    </div>
     <div id="economicCharts"></div>
   </div>
 </div>
