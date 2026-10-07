@@ -44,6 +44,25 @@ main{
   cursor:pointer;
   font-weight:600
 }
+.today{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  width:auto;
+  padding:7px 10px;
+  margin:0 0 10px;
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  background:#f9fafb;
+  box-shadow:none;
+  color:#374151;
+  font-size:13px;
+  line-height:1.1
+}
+.today:hover{
+  background:#f3f4f6;
+  border-color:#9ca3af
+}
 #weekLabel{text-align:center;font-weight:700;font-size:14px}
 
 .summary{
@@ -642,7 +661,7 @@ footer{
 <button onclick="changeWeek(7)">›</button>
 </div>
 
-<button class="today" onclick="goToday()">Torna a oggi</button>
+<button class="today" onclick="goToday()">↩ Torna a oggi</button>
 
 <div class="summary">
 <div class="card"><small>Lezioni previste</small><strong id="plannedLessons">0</strong></div>
