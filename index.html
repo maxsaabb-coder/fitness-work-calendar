@@ -1913,11 +1913,14 @@ totalEuro += v.euro;
         const h=Math.floor(v.min/60);
         const min=v.min%60;
 
+        const tariffa = v.n > 0 ? (v.euro / v.n) : 0;
+
         html += `
           <div class="billingCard">
             <h4>${names[g]}</h4>
             <div class="billingMetric"><span>Lezioni svolte</span><strong>${v.n}</strong></div>
             <div class="billingMetric"><span>Ore svolte</span><strong>${h}h ${min}m</strong></div>
+            <div class="billingMetric"><span>Calcolo</span><strong>${v.n} × ${formatEuro(tariffa)}</strong></div>
             <div class="billingAmount">
               <span>DA FATTURARE</span>
               <strong>${formatEuro(v.euro)}</strong>
