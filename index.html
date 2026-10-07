@@ -248,6 +248,25 @@ main{
 }
 .profitrow .line1{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
 .profitrow .line2{margin-top:5px;color:#6b7280;font-size:13px;line-height:1.45}
+.profitBestBadge{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  margin-left:8px;
+  padding:2px 7px;
+  border-radius:999px;
+  background:#fef3c7;
+  border:1px solid #f59e0b;
+  color:#92400e;
+  font-size:11px;
+  font-weight:700;
+  white-space:nowrap;
+}
+.profitrow.isBestProfit{
+  border-color:#f59e0b;
+  background:#fffbeb;
+}
+
 .kmSettings{
   background:#f9fafb;
   border:1px solid #e5e7eb;
@@ -1741,9 +1760,9 @@ totalEuro += v.euro;
         const euroHour=hours>0 ? d.gross/hours : 0;
         const net=d.gross-d.carCost;
         html += `
-          <div class="profitrow">
+          <div class="profitrow ${d===bestNet ? 'isBestProfit' : ''}">
             <div class="line1">
-              <b>${d.name}</b>
+              <b>${d.name}${d===bestNet ? '<span class="profitBestBadge">★ Più redditizio</span>' : ''}</b>
               <span><b>${formatEuro(net)}</b> netto trasporti</span>
             </div>
             <div class="line2">
@@ -2047,8 +2066,8 @@ totalEuro += v.euro;
         const eurHour=hours>0 ? v.gross/hours : 0;
         const net=v.gross-v.carCost;
         html+=`
-          <div class="profitrow">
-            <div class="line1"><b>${names[g]}</b><span><b>${formatEuro(net)}</b> netto trasporti</span></div>
+          <div class="profitrow ${g===bestNet[0] ? 'isBestProfit' : ''}">
+            <div class="line1"><b>${names[g]}${g===bestNet[0] ? '<span class="profitBestBadge">★ Più redditizia</span>' : ''}</b><span><b>${formatEuro(net)}</b> netto trasporti</span></div>
             <div class="line2">
               ${v.n} lez. · ${Math.floor(v.min/60)}h ${v.min%60}m · fatturato ${formatEuro(v.gross)} · ${formatEuro(eurHour)}/h<br>
               ${v.km.toFixed(1)} km auto attribuiti · costo auto ${formatEuro(v.carCost)}
