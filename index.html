@@ -95,6 +95,29 @@ main{
 }
 #weekLabel{text-align:center;font-weight:700;font-size:14px}
 
+.backTopWrap{
+  display:flex;
+  justify-content:flex-end;
+  margin:8px 0 12px
+}
+.backTopBtn{
+  border:1px solid #9cc6cf;
+  border-left:4px solid #2f6f7e;
+  border-right:4px solid #2f6f7e;
+  border-radius:9px;
+  background:#f3fafb;
+  color:#234e59;
+  padding:7px 11px;
+  font-size:12px;
+  font-weight:700;
+  cursor:pointer;
+  line-height:1.1
+}
+.backTopBtn:hover{
+  background:#eaf5f7;
+  border-color:#7fb3bf
+}
+
 .summary{
   display:grid;
   grid-template-columns:repeat(5,1fr);
@@ -727,7 +750,7 @@ footer{
   </button>
 </div>
 
-<main>
+<main id="pageTop">
 
 <div class="weeknav">
 <button onclick="changeWeek(-7)">‹</button>
@@ -768,6 +791,7 @@ footer{
   <button class="summaryNavBtn" onclick="changeWeek(7)" aria-label="Settimana successiva">›</button>
 </div>
 <div id="gymTotals"></div>
+<div class="backTopWrap"><button class="backTopBtn" onclick="goPageTop()">↑ Torna in alto</button></div>
   <div class="gymTotals" style="margin-top:24px">
   <div class="summaryNav">
   <button class="summaryNavBtn" onclick="changeMonth(-1)" aria-label="Mese precedente">‹</button>
@@ -775,6 +799,7 @@ footer{
   <button class="summaryNavBtn" onclick="changeMonth(1)" aria-label="Mese successivo">›</button>
 </div>
   <div id="monthTotals"></div>
+  <div class="backTopWrap"><button class="backTopBtn" onclick="goPageTop()">↑ Torna in alto</button></div>
     <div class="gymTotals" style="margin-top:24px">
   <div class="summaryNav">
     <button class="summaryNavBtn" onclick="changeYear(-1)" aria-label="Anno precedente">‹</button>
@@ -824,6 +849,7 @@ footer{
     </div>
     <div id="economicCharts"></div>
   </div>
+  <div class="backTopWrap"><button class="backTopBtn" onclick="goPageTop()">↑ Torna in alto</button></div>
 </div>
 
 <div class="gymTotals historyHub">
@@ -3587,6 +3613,12 @@ setInterval(() => {
 
 function scrollToQuickSection(id){
   const el=document.getElementById(id);
+  if(!el) return;
+  el.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function goPageTop(){
+  const el=document.getElementById("pageTop");
   if(!el) return;
   el.scrollIntoView({behavior:"smooth",block:"start"});
 }
