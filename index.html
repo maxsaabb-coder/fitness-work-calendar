@@ -162,35 +162,78 @@ main{
 }
 
 .days{
-  display:flex;
-  overflow-x:auto;
-  gap:7px;
-  margin:15px 0 12px
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:10px;
+  margin:16px 0 14px
 }
 .daybtn{
-  min-width:82px;
-  border:0;
-  background:white;
-  padding:10px 7px 16px;
-  border-radius:10px;
-  font-weight:600;
+  min-width:0;
+  min-height:70px;
+  box-sizing:border-box;
+  border:2px solid #9cc6cf;
+  border-left:5px solid #2f6f7e;
+  border-right:5px solid #2f6f7e;
+  background:#f3fafb;
+  color:#234e59;
+  padding:11px 10px 20px;
+  border-radius:12px;
+  font-size:14px;
+  font-weight:800;
+  line-height:1.15;
   cursor:pointer;
   position:relative
 }
-.daybtn.active{background:#111827;color:white}
+.daybtn small{
+  display:block;
+  margin-top:5px;
+  font-size:12px;
+  font-weight:700;
+  color:#5f7f86
+}
+.daybtn:hover{
+  background:#eaf5f7;
+  border-color:#7fb3bf
+}
+.daybtn.active{
+  background:#111827;
+  color:white;
+  border-color:#111827;
+  border-left-color:#2f6f7e;
+  border-right-color:#2f6f7e
+}
+.daybtn.active small{color:#d1d5db}
 .dayDots{
   position:absolute;
-  right:7px;
-  bottom:5px;
+  left:50%;
+  bottom:6px;
+  transform:translateX(-50%);
   display:flex;
   align-items:center;
-  gap:4px
+  justify-content:center;
+  gap:6px
 }
 .dayDot{
-  width:7px;
-  height:7px;
+  width:10px;
+  height:10px;
   border-radius:50%;
-  display:block
+  display:block;
+  box-shadow:0 0 0 1px #fff8
+}
+@media (max-width:600px){
+  .days{
+    display:flex;
+    overflow-x:auto;
+    gap:8px;
+    padding-bottom:2px;
+    scrollbar-width:thin
+  }
+  .daybtn{
+    flex:0 0 92px;
+    min-height:68px;
+    font-size:13px
+  }
+  .daybtn small{font-size:11px}
 }
 .dayDot.event{background:#7c3aed}
 .dayDot.event.holiday{background:#7c3aed}
