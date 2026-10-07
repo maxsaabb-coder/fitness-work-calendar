@@ -1916,6 +1916,20 @@ totalEuro += v.euro;
       const totalNet=totalGross-totalCost;
       const avgHour=totalMin>0 ? totalGross/(totalMin/60) : 0;
 
+      const activeDays=[1,2,3,4,5].filter(wd=>days[wd].gross>0 || days[wd].min>0);
+      const bestDayWd=activeDays.length
+        ? activeDays.reduce((best,wd)=>
+            (days[wd].gross-days[wd].cost) > (days[best].gross-days[best].cost) ? wd : best
+          )
+        : null;
+
+      const activeGyms=Object.keys(gyms).filter(g=>gyms[g].gross>0 || gyms[g].min>0);
+      const bestGymCode=activeGyms.length
+        ? activeGyms.reduce((best,g)=>
+            (gyms[g].gross-gyms[g].cost) > (gyms[best].gross-gyms[best].cost) ? g : best
+          )
+        : null;
+
       const gymOrder=["AR","MAX","TN","STSM"];
       const grossGym=gymOrder.map(g=>({label:gymNames[g],value:gyms[g].gross,color:gymColors[g]}));
       const hourlyGym=gymOrder.map(g=>({label:gymNames[g],value:gyms[g].min>0?gyms[g].gross/(gyms[g].min/60):0,color:gymColors[g]}));
@@ -1924,6 +1938,18 @@ totalEuro += v.euro;
 
       target.innerHTML=`
         <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin:0 0 12px;font-size:13px;color:#1e3a8a"><strong>Periodo analizzato:</strong> ${monthName}. Tutti i valori e tutti i grafici qui sotto sono calcolati sull'intero mese selezionato.</div>
+        <div class="profitHeader" style="margin-bottom:12px">
+          <div class="profitCard">
+            <small>★ Miglior giorno</small>
+            <strong>${bestDayWd ? `${weekdayNames[bestDayWd]} · ${formatEuro(days[bestDayWd].gross-days[bestDayWd].cost)}` : "Nessun dato"}</strong>
+            <span style="font-size:12px;color:#6b7280">netto trasporti</span>
+          </div>
+          <div class="profitCard">
+            <small>★ Miglior palestra</small>
+            <strong>${bestGymCode ? `${gymNames[bestGymCode] || bestGymCode} · ${formatEuro(gyms[bestGymCode].gross-gyms[bestGymCode].cost)}` : "Nessun dato"}</strong>
+            <span style="font-size:12px;color:#6b7280">netto trasporti</span>
+          </div>
+        </div>
         <div class="econCards">
           <div class="econCard"><small>Fatturato del mese</small><strong>${formatEuro(totalGross)}</strong><span>${rows.length} lezioni · ${Math.floor(totalMin/60)}h ${totalMin%60}m</span></div>
           <div class="econCard"><small>Costo auto del mese</small><strong>${formatEuro(totalCost)}</strong><span>${totalKm.toFixed(1)} km auto</span></div>
