@@ -318,6 +318,19 @@ main{
   align-items:center;
   gap:12px
 }
+.billingTotal.clickable{
+  cursor:pointer;
+  transition:background .15s ease, transform .15s ease, box-shadow .15s ease
+}
+.billingTotal.clickable:hover{
+  background:#eaf5f7;
+  box-shadow:0 3px 10px #0001;
+  transform:translateY(-1px)
+}
+.billingTotal.clickable:focus{
+  outline:3px solid #bae6fd;
+  outline-offset:2px
+}
 .billingTotal small{
   display:block;
   color:#6b7280;
@@ -2127,6 +2140,99 @@ totalEuro += v.euro;
     }
   }
 
+  async function openBillingTotal(){
+    const screen=document.getElementById("billingGymScreen");
+    const title=document.getElementById("billingGymTitle");
+    const content=document.getElementById("billingGymContent");
+    if(!screen || !title || !content) return;
+
+    billingReturnScrollY=window.scrollY;
+
+    const monthDate=new Date(summaryMonth);
+    const y=monthDate.getFullYear();
+    const m=monthDate.getMonth();
+    const start=iso(new Date(y,m,1));
+    const end=iso(new Date(y,m+1,0));
+    const monthName=monthDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+
+    title.textContent="Totale fatturazione · "+monthName;
+    content.innerHTML='<div class="billingGymEmpty">Caricamento dati…</div>';
+    screen.classList.add("open");
+    screen.setAttribute("aria-hidden","false");
+    document.body.style.overflow="hidden";
+
+    try{
+      const {data,error}=await supabaseClient
+        .from("lessons")
+        .select("lesson_date,gym_code,minutes,price,status")
+        .gte("lesson_date",start)
+        .lte("lesson_date",end)
+        .eq("status","done")
+        .order("lesson_date",{ascending:true});
+
+      if(error) throw error;
+
+      const names={"AR":"A&R","MAX":"MAX","TN":"TN","STSM":"STSM"};
+      const order=["AR","MAX","TN","STSM"];
+      const gyms={
+        "AR":{n:0,min:0,euro:0},
+        "MAX":{n:0,min:0,euro:0},
+        "TN":{n:0,min:0,euro:0},
+        "STSM":{n:0,min:0,euro:0}
+      };
+
+      (data || []).forEach(r=>{
+        const g=r.gym_code;
+        if(!gyms[g]) return;
+        gyms[g].n += 1;
+        gyms[g].min += Number(r.minutes || 0);
+        gyms[g].euro += Number(r.price || 0);
+      });
+
+      let totalN=0,totalMin=0,totalEuro=0;
+      let html='<div class="billingGymListTitle">Riepilogo mensile per palestra</div>';
+
+      order.forEach(g=>{
+        const v=gyms[g];
+        totalN += v.n;
+        totalMin += v.min;
+        totalEuro += v.euro;
+        const h=Math.floor(v.min/60);
+        const min=v.min%60;
+
+        html += `
+          <div class="billingLessonRow">
+            <div class="dateCol"><b>${names[g]}</b></div>
+            <div class="timeCol">${v.n} lezioni</div>
+            <div class="nameCol">
+              <div class="lessonName">${h}h ${min}m</div>
+              <div class="muted">Totale ore svolte</div>
+            </div>
+            <div class="minutesCol"></div>
+            <div class="amount">${formatEuro(v.euro)}</div>
+          </div>`;
+      });
+
+      const totalH=Math.floor(totalMin/60);
+      const totalM=totalMin%60;
+
+      html += `
+        <div class="billingTotal" style="margin-top:16px">
+          <div>
+            <b>Totale generale del mese</b>
+            <small>${totalN} lezioni · ${totalH}h ${totalM}m</small>
+          </div>
+          <strong>${formatEuro(totalEuro)}</strong>
+        </div>`;
+
+      content.innerHTML=html;
+      screen.scrollTop=0;
+    }catch(err){
+      console.error("Errore totale fatturazione mensile:",err);
+      content.innerHTML='<div class="billingGymEmpty">Impossibile caricare il totale mensile.</div>';
+    }
+  }
+
   function closeBillingGym(){
     const screen=document.getElementById("billingGymScreen");
     if(!screen) return;
@@ -2211,7 +2317,9 @@ totalEuro += v.euro;
       const totalH=Math.floor(totalMin/60);
       const totalM=totalMin%60;
       html += `
-        <div class="billingTotal">
+        <div class="billingTotal clickable" role="button" tabindex="0"
+             onclick="openBillingTotal()"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openBillingTotal()}">
           <div>
             <b>Totale del mese</b>
             <small>${totalN} lezioni · ${totalH}h ${totalM}m</small>
