@@ -199,6 +199,42 @@ main{
   font-size:23px;
   white-space:nowrap
 }
+
+/* Pulsante flottante nello Storico lezioni */
+.historyFloatTop{
+  position:fixed;
+  right:18px;
+  top:50%;
+  transform:translateY(-50%);
+  z-index:80;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  border:2px solid #9cc6cf;
+  border-left:5px solid #2f6f7e;
+  border-right:5px solid #2f6f7e;
+  border-radius:12px;
+  background:#f3fafb;
+  color:#234e59;
+  padding:10px 12px;
+  box-shadow:0 3px 12px #0002;
+  cursor:pointer;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.15;
+}
+.historyFloatTop.show{display:flex}
+.historyFloatTop:hover{
+  background:#eaf5f7;
+  border-color:#7fb3bf
+}
+@media (max-width:600px){
+  .historyFloatTop{
+    right:8px;
+    padding:9px 8px;
+    font-size:11px
+  }
+}
 @media (max-width:700px){
   .billingGrid{grid-template-columns:repeat(2,1fr)}
 }
@@ -953,7 +989,7 @@ footer{
   <div class="backTopWrap"><button class="backTopBtn" onclick="goPageTop()">↑ Torna in alto</button></div>
 </div>
 
-<div class="gymTotals historyHub">
+<div id="historyHub" class="gymTotals historyHub">
   <div class="historyControls">
     <button onclick="changeHistoryMonth(-1)">‹</button>
     <div id="historyTitle" class="historyTitle">Storico lezioni</div>
@@ -979,6 +1015,10 @@ footer{
 </div>
 
 </main>
+
+<button id="historyFloatTop" class="historyFloatTop" onclick="goPageTop()" aria-label="Torna in alto">
+  ↑ Torna in alto
+</button>
 
 <footer>Fitness Work Calendar · Olga</footer>
 
@@ -3517,6 +3557,7 @@ function renderDailySummary(){
   }
 
   function render(){
+ initHistoryFloatingTop();
  renderWeekLabel();
  renderDays();
  renderDayExceptionBanner();
@@ -3812,6 +3853,22 @@ function goPageTop(){
   const el=document.getElementById("pageTop");
   if(!el) return;
   el.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function initHistoryFloatingTop(){
+  const history=document.getElementById("historyHub");
+  const btn=document.getElementById("historyFloatTop");
+  if(!history || !btn) return;
+
+  const update=()=>{
+    const r=history.getBoundingClientRect();
+    const visible = r.top < window.innerHeight && r.bottom > 0;
+    btn.classList.toggle("show", visible);
+  };
+
+  window.addEventListener("scroll", update, {passive:true});
+  window.addEventListener("resize", update);
+  update();
 }
 
 function goToday(){
