@@ -383,6 +383,65 @@ main{
   font-size:23px;
   white-space:nowrap
 }
+.billingYearAccess{
+  margin-top:10px;
+  border:2px solid #9cc6cf;
+  border-left:5px solid #2f6f7e;
+  border-right:5px solid #2f6f7e;
+  border-radius:12px;
+  background:#f8fcfd;
+  padding:12px 14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  cursor:pointer;
+  box-sizing:border-box
+}
+.billingYearAccess:hover{
+  background:#eaf5f7;
+  box-shadow:0 3px 10px #0001
+}
+.billingYearAccess small{
+  display:block;
+  color:#6b7280;
+  margin-top:3px
+}
+.billingYearAccess strong{
+  font-size:17px
+}
+.billingAnnualRow{
+  display:grid;
+  grid-template-columns:140px 110px 1fr 110px;
+  gap:12px;
+  align-items:center;
+  border:1px solid #d1d5db;
+  border-left:5px solid #2f6f7e;
+  border-right:5px solid #2f6f7e;
+  border-radius:10px;
+  background:white;
+  padding:11px 12px;
+  margin:8px 0;
+  cursor:pointer
+}
+.billingAnnualRow:hover{background:#f3fafb}
+.billingAnnualRow .monthName{font-weight:800}
+.billingAnnualRow .monthMeta{font-size:12px;color:#6b7280}
+.billingAnnualRow .monthAmount{text-align:right;font-weight:900;font-size:16px}
+@media (max-width:600px){
+  .billingAnnualRow{
+    grid-template-columns:1fr auto;
+    gap:5px 10px
+  }
+  .billingAnnualRow .monthMeta{
+    grid-column:1
+  }
+  .billingAnnualRow .monthAmount{
+    grid-column:2;
+    grid-row:1 / span 2;
+    align-self:center
+  }
+}
 
 /* Pulsante flottante nello Storico lezioni */
 .historyFloatTop{
@@ -1205,9 +1264,9 @@ footer{
     <div class="billingGymHeaderInner">
       <button class="billingGymBack" onclick="closeBillingGym()">← Torna a Fatturazione</button>
       <div class="billingGymTitleNav">
-        <button class="billingGymMonthBtn" onclick="changeBillingDetailMonth(-1)" aria-label="Mese precedente">‹</button>
+        <button class="billingGymMonthBtn" onclick="changeBillingDetailPeriod(-1)" aria-label="Mese precedente">‹</button>
         <h2 id="billingGymTitle">Dettaglio palestra</h2>
-        <button class="billingGymMonthBtn" onclick="changeBillingDetailMonth(1)" aria-label="Mese successivo">›</button>
+        <button class="billingGymMonthBtn" onclick="changeBillingDetailPeriod(1)" aria-label="Mese successivo">›</button>
       </div>
     </div>
   </div>
@@ -2294,8 +2353,15 @@ totalEuro += v.euro;
     }
   }
 
-  async function changeBillingDetailMonth(delta){
+  async function changeBillingDetailPeriod(delta){
     if(!billingDetailMonth) billingDetailMonth=new Date(summaryMonth);
+
+    if(billingDetailMode==="year"){
+      billingDetailMonth.setFullYear(billingDetailMonth.getFullYear()+delta);
+      await openBillingYear(true);
+      return;
+    }
+
     billingDetailMonth.setMonth(billingDetailMonth.getMonth()+delta);
 
     if(billingDetailMode==="total"){
@@ -2305,11 +2371,109 @@ totalEuro += v.euro;
     }
   }
 
+  async function openBillingYear(preserveYear=false){
+    const screen=document.getElementById("billingGymScreen");
+    const title=document.getElementById("billingGymTitle");
+    const content=document.getElementById("billingGymContent");
+    if(!screen || !title || !content) return;
+
+    if(!preserveYear){
+      billingReturnScrollY=window.scrollY;
+      billingDetailMonth=new Date(summaryMonth);
+    }
+
+    billingDetailGymCode=null;
+    billingDetailMode="year";
+
+    const year=(billingDetailMonth || summaryMonth).getFullYear();
+    const start=`${year}-01-01`;
+    const end=`${year}-12-31`;
+
+    title.textContent="Totali fatturati · "+year;
+    content.innerHTML='<div class="billingGymEmpty">Caricamento dati…</div>';
+    screen.classList.add("open");
+    screen.setAttribute("aria-hidden","false");
+    document.body.style.overflow="hidden";
+
+    try{
+      const {data,error}=await supabaseClient
+        .from("lessons")
+        .select("lesson_date,minutes,price,status")
+        .gte("lesson_date",start)
+        .lte("lesson_date",end)
+        .eq("status","done")
+        .order("lesson_date",{ascending:true});
+
+      if(error) throw error;
+
+      const months=Array.from({length:12},()=>({n:0,min:0,euro:0}));
+      (data || []).forEach(r=>{
+        const m=new Date(r.lesson_date+"T12:00:00").getMonth();
+        months[m].n += 1;
+        months[m].min += Number(r.minutes || 0);
+        months[m].euro += Number(r.price || 0);
+      });
+
+      const monthNames=[
+        "Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno",
+        "Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"
+      ];
+
+      let totalN=0,totalMin=0,totalEuro=0;
+      let html='<div class="billingGymListTitle">Fatturato mensile dell’anno</div>';
+
+      months.forEach((v,m)=>{
+        totalN += v.n;
+        totalMin += v.min;
+        totalEuro += v.euro;
+        const h=Math.floor(v.min/60);
+        const min=v.min%60;
+
+        html += `
+          <div class="billingAnnualRow" role="button" tabindex="0"
+               onclick="openBillingMonthFromYear(${m})"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openBillingMonthFromYear(${m})}">
+            <div>
+              <div class="monthName">${monthNames[m]}</div>
+              <div class="monthMeta">${v.n} lezioni</div>
+            </div>
+            <div class="monthMeta">${h}h ${min}m</div>
+            <div></div>
+            <div class="monthAmount">${formatEuro(v.euro)}</div>
+          </div>`;
+      });
+
+      const totalH=Math.floor(totalMin/60);
+      const totalM=totalMin%60;
+      html += `
+        <div class="billingTotal" style="margin-top:16px">
+          <div>
+            <b>Totale fatturato ${year}</b>
+            <small>${totalN} lezioni · ${totalH}h ${totalM}m</small>
+          </div>
+          <strong>${formatEuro(totalEuro)}</strong>
+        </div>`;
+
+      content.innerHTML=html;
+      screen.scrollTop=0;
+    }catch(err){
+      console.error("Errore fatturazione annuale:",err);
+      content.innerHTML='<div class="billingGymEmpty">Impossibile caricare i totali annuali.</div>';
+    }
+  }
+
+  async function openBillingMonthFromYear(monthIndex){
+    if(!billingDetailMonth) billingDetailMonth=new Date(summaryMonth);
+    billingDetailMonth=new Date(billingDetailMonth.getFullYear(),monthIndex,1);
+    billingDetailMode="total";
+    await openBillingTotal(true);
+  }
+
   function closeBillingGym(){
     const screen=document.getElementById("billingGymScreen");
     if(!screen) return;
 
-    if(billingDetailMonth){
+    if(billingDetailMonth && billingDetailMode!=="year"){
       summaryMonth=new Date(billingDetailMonth);
       renderMonthlySummary();
       renderDailyProfitability();
@@ -2407,6 +2571,15 @@ totalEuro += v.euro;
             <small>${totalN} lezioni · ${totalH}h ${totalM}m</small>
           </div>
           <strong>${formatEuro(totalEuro)}</strong>
+        </div>
+        <div class="billingYearAccess" role="button" tabindex="0"
+             onclick="openBillingYear()"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openBillingYear()}">
+          <div>
+            <strong>📊 Totali fatturati dell’anno</strong>
+            <small>Visualizza mese per mese il fatturato ${monthDate.getFullYear()}</small>
+          </div>
+          <strong>Apri ›</strong>
         </div>`;
 
       target.innerHTML=html;
