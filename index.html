@@ -118,6 +118,94 @@ main{
   border-color:#7fb3bf
 }
 
+/* Fatturazione mensile */
+.billingHub{margin-top:24px}
+.billingIntro{
+  margin:10px 0 14px;
+  padding:10px 12px;
+  border:1px solid #bfdbfe;
+  border-radius:10px;
+  background:#eff6ff;
+  color:#1e3a8a;
+  font-size:13px;
+  line-height:1.4
+}
+.billingGrid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin:12px 0
+}
+.billingCard{
+  min-width:0;
+  border:2px solid #9cc6cf;
+  border-left:5px solid #2f6f7e;
+  border-radius:12px;
+  background:#f8fcfd;
+  padding:12px;
+  box-sizing:border-box
+}
+.billingCard h4{
+  margin:0 0 8px;
+  font-size:16px
+}
+.billingMetric{
+  display:flex;
+  justify-content:space-between;
+  gap:8px;
+  padding:4px 0;
+  font-size:13px;
+  border-bottom:1px solid #e5e7eb
+}
+.billingMetric:last-child{border-bottom:0}
+.billingMetric strong{white-space:nowrap}
+.billingAmount{
+  margin-top:10px;
+  padding-top:9px;
+  border-top:2px solid #dbeafe;
+  display:flex;
+  justify-content:space-between;
+  align-items:end;
+  gap:8px
+}
+.billingAmount span{
+  font-size:12px;
+  color:#6b7280;
+  font-weight:700
+}
+.billingAmount strong{
+  font-size:21px;
+  color:#111827
+}
+.billingTotal{
+  margin-top:12px;
+  border:2px solid #9cc6cf;
+  border-left:5px solid #2f6f7e;
+  border-right:5px solid #2f6f7e;
+  border-radius:12px;
+  background:#f3fafb;
+  padding:12px 14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px
+}
+.billingTotal small{
+  display:block;
+  color:#6b7280;
+  margin-top:3px
+}
+.billingTotal strong{
+  font-size:23px;
+  white-space:nowrap
+}
+@media (max-width:700px){
+  .billingGrid{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:420px){
+  .billingGrid{grid-template-columns:1fr}
+}
+
 .summary{
   display:grid;
   grid-template-columns:repeat(5,1fr);
@@ -763,7 +851,7 @@ footer{
   <button class="quickNavBtn" onclick="scrollToQuickSection('weekSummaryTitle')">📅 Settimana</button>
   <button class="quickNavBtn" onclick="scrollToQuickSection('monthTitle')">🗓 Mese</button>
   <button class="quickNavBtn" onclick="scrollToQuickSection('profitabilityHub')">€ Redditività</button>
-  <button class="quickNavBtn future" disabled title="La sezione verrà aggiunta nel prossimo passaggio">🧾 Fatturazione</button>
+  <button class="quickNavBtn" onclick="scrollToQuickSection('billingHub')">🧾 Fatturazione</button>
 </div>
 
 <div class="summary">
@@ -849,6 +937,19 @@ footer{
     </div>
     <div id="economicCharts"></div>
   </div>
+  <div class="backTopWrap"><button class="backTopBtn" onclick="goPageTop()">↑ Torna in alto</button></div>
+</div>
+
+<div id="billingHub" class="gymTotals billingHub">
+  <div class="summaryNav">
+    <button class="summaryNavBtn" onclick="changeMonth(-1)" aria-label="Mese precedente nella fatturazione">‹</button>
+    <h3 id="billingTitle" style="margin:0;text-align:center;flex:1">Fatturazione mensile</h3>
+    <button class="summaryNavBtn" onclick="changeMonth(1)" aria-label="Mese successivo nella fatturazione">›</button>
+  </div>
+  <div class="billingIntro">
+    Riepilogo delle sole <b>lezioni svolte</b>, raggruppate per palestra. Gli importi qui indicati sono quelli da usare come riferimento per la fattura mensile.
+  </div>
+  <div id="billingSummary"></div>
   <div class="backTopWrap"><button class="backTopBtn" onclick="goPageTop()">↑ Torna in alto</button></div>
 </div>
 
@@ -1673,6 +1774,7 @@ function changeMonth(delta){
   renderDailyProfitability();
   renderGymProfitability();
   renderEconomicCharts();
+  renderBillingSummary();
 }
   function changeYear(delta){
   summaryYear += delta;
@@ -1758,6 +1860,91 @@ totalEuro += v.euro;
       "<div>Impossibile caricare il riepilogo mensile.</div>";
   }
 }
+  async function renderBillingSummary(){
+    const target=document.getElementById("billingSummary");
+    const title=document.getElementById("billingTitle");
+    if(!target || !title) return;
+
+    try{
+      const monthDate=new Date(summaryMonth);
+      const y=monthDate.getFullYear();
+      const m=monthDate.getMonth();
+      const start=iso(new Date(y,m,1));
+      const end=iso(new Date(y,m+1,0));
+
+      const {data,error}=await supabaseClient
+        .from("lessons")
+        .select("lesson_date,gym_code,minutes,price,status")
+        .gte("lesson_date",start)
+        .lte("lesson_date",end)
+        .eq("status","done")
+        .order("lesson_date",{ascending:true});
+
+      if(error) throw error;
+
+      const names={"AR":"A&R","MAX":"MAX","TN":"TN","STSM":"STSM"};
+      const order=["AR","MAX","TN","STSM"];
+      const gyms={
+        "AR":{n:0,min:0,euro:0},
+        "MAX":{n:0,min:0,euro:0},
+        "TN":{n:0,min:0,euro:0},
+        "STSM":{n:0,min:0,euro:0}
+      };
+
+      (data || []).forEach(r=>{
+        const g=r.gym_code || "ALTRO";
+        if(!gyms[g]) gyms[g]={n:0,min:0,euro:0};
+        gyms[g].n += 1;
+        gyms[g].min += Number(r.minutes || 0);
+        gyms[g].euro += Number(r.price || 0);
+      });
+
+      const monthName=monthDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+      title.textContent="Fatturazione · " + monthName;
+
+      let totalN=0,totalMin=0,totalEuro=0;
+      let html='<div class="billingGrid">';
+
+      order.forEach(g=>{
+        const v=gyms[g];
+        totalN += v.n;
+        totalMin += v.min;
+        totalEuro += v.euro;
+        const h=Math.floor(v.min/60);
+        const min=v.min%60;
+
+        html += `
+          <div class="billingCard">
+            <h4>${names[g]}</h4>
+            <div class="billingMetric"><span>Lezioni svolte</span><strong>${v.n}</strong></div>
+            <div class="billingMetric"><span>Ore svolte</span><strong>${h}h ${min}m</strong></div>
+            <div class="billingAmount">
+              <span>DA FATTURARE</span>
+              <strong>${formatEuro(v.euro)}</strong>
+            </div>
+          </div>`;
+      });
+
+      html += '</div>';
+
+      const totalH=Math.floor(totalMin/60);
+      const totalM=totalMin%60;
+      html += `
+        <div class="billingTotal">
+          <div>
+            <b>Totale del mese</b>
+            <small>${totalN} lezioni · ${totalH}h ${totalM}m</small>
+          </div>
+          <strong>${formatEuro(totalEuro)}</strong>
+        </div>`;
+
+      target.innerHTML=html;
+    }catch(err){
+      console.error("Errore fatturazione mensile:",err);
+      target.innerHTML='<div>Impossibile caricare il riepilogo fatturazione.</div>';
+    }
+  }
+
   function formatEuro(value){
     return "€" + Number(value || 0).toFixed(2).replace(".",",");
   }
@@ -3341,6 +3528,7 @@ function renderDailySummary(){
     renderDailyProfitability();
     renderGymProfitability();
     renderEconomicCharts();
+    renderBillingSummary();
     restoreProfitTab();
  syncAccessUI();
 }
