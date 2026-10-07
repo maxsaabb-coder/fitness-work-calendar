@@ -145,6 +145,134 @@ main{
   padding:12px;
   box-sizing:border-box
 }
+.billingCard.clickable{
+  border-right:5px solid #2f6f7e;
+  cursor:pointer;
+  transition:background .15s ease, transform .15s ease, box-shadow .15s ease
+}
+.billingCard.clickable:hover{
+  background:#eaf5f7;
+  box-shadow:0 3px 10px #0001;
+  transform:translateY(-1px)
+}
+.billingCard.clickable:focus{
+  outline:3px solid #bae6fd;
+  outline-offset:2px
+}
+
+/* Dettaglio fatturazione singola palestra */
+.billingGymScreen{
+  position:fixed;
+  inset:0;
+  z-index:140;
+  display:none;
+  overflow-y:auto;
+  background:#f7f8fa;
+  color:#111827
+}
+.billingGymScreen.open{display:block}
+.billingGymHeader{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#111827;
+  color:white;
+  box-shadow:0 2px 8px #0003
+}
+.billingGymHeaderInner{
+  max-width:900px;
+  margin:auto;
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  gap:14px
+}
+.billingGymBack{
+  border:1px solid #9cc6cf;
+  border-left:5px solid #2f6f7e;
+  border-right:5px solid #2f6f7e;
+  border-radius:9px;
+  background:#f3fafb;
+  color:#234e59;
+  padding:8px 11px;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap
+}
+.billingGymHeader h2{
+  margin:0;
+  font-size:19px
+}
+.billingGymWrap{
+  max-width:900px;
+  margin:auto;
+  padding:18px 16px 28px
+}
+.billingGymSummary{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+  margin-bottom:16px
+}
+.billingGymStat{
+  border:2px solid #9cc6cf;
+  border-left:5px solid #2f6f7e;
+  border-radius:12px;
+  background:#f8fcfd;
+  padding:11px 12px
+}
+.billingGymStat small{
+  display:block;
+  color:#6b7280;
+  font-weight:700;
+  margin-bottom:4px
+}
+.billingGymStat strong{
+  font-size:20px
+}
+.billingGymListTitle{
+  margin:18px 0 10px;
+  font-size:17px
+}
+.billingLessonRow{
+  display:grid;
+  grid-template-columns:110px 92px 1fr 90px 90px;
+  gap:10px;
+  align-items:center;
+  border:1px solid #d1d5db;
+  border-left:5px solid #2f6f7e;
+  border-radius:10px;
+  background:white;
+  padding:10px 12px;
+  margin:8px 0
+}
+.billingLessonRow .lessonName{font-weight:800}
+.billingLessonRow .muted{font-size:12px;color:#6b7280}
+.billingLessonRow .amount{text-align:right;font-weight:800}
+.billingGymEmpty{
+  padding:18px;
+  border:1px dashed #9ca3af;
+  border-radius:10px;
+  color:#6b7280;
+  text-align:center;
+  background:white
+}
+@media (max-width:700px){
+  .billingGymSummary{grid-template-columns:repeat(2,1fr)}
+  .billingLessonRow{
+    grid-template-columns:1fr auto;
+    gap:5px 10px
+  }
+  .billingLessonRow .dateCol,
+  .billingLessonRow .timeCol,
+  .billingLessonRow .nameCol{grid-column:1}
+  .billingLessonRow .amount{
+    grid-column:2;
+    grid-row:1 / span 3;
+    align-self:center
+  }
+  .billingLessonRow .minutesCol{grid-column:1}
+}
 .billingCard h4{
   margin:0 0 8px;
   font-size:16px
@@ -1015,6 +1143,18 @@ footer{
 </div>
 
 </main>
+
+<div id="billingGymScreen" class="billingGymScreen" aria-hidden="true">
+  <div class="billingGymHeader">
+    <div class="billingGymHeaderInner">
+      <button class="billingGymBack" onclick="closeBillingGym()">← Torna a Fatturazione</button>
+      <h2 id="billingGymTitle">Dettaglio palestra</h2>
+    </div>
+  </div>
+  <div class="billingGymWrap">
+    <div id="billingGymContent"></div>
+  </div>
+</div>
 
 <button id="historyFloatTop" class="historyFloatTop" onclick="goPageTop()" aria-label="Torna in alto">
   ↑ Torna in alto
@@ -1900,6 +2040,102 @@ totalEuro += v.euro;
       "<div>Impossibile caricare il riepilogo mensile.</div>";
   }
 }
+  let billingReturnScrollY = 0;
+
+  async function openBillingGym(gymCode){
+    const screen=document.getElementById("billingGymScreen");
+    const title=document.getElementById("billingGymTitle");
+    const content=document.getElementById("billingGymContent");
+    if(!screen || !title || !content) return;
+
+    billingReturnScrollY=window.scrollY;
+    const names={"AR":"A&R","MAX":"MAX","TN":"TN","STSM":"STSM"};
+    const gymName=names[gymCode] || gymCode;
+
+    const monthDate=new Date(summaryMonth);
+    const y=monthDate.getFullYear();
+    const m=monthDate.getMonth();
+    const start=iso(new Date(y,m,1));
+    const end=iso(new Date(y,m+1,0));
+    const monthName=monthDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
+
+    title.textContent=gymName+" · "+monthName;
+    content.innerHTML='<div class="billingGymEmpty">Caricamento dati…</div>';
+    screen.classList.add("open");
+    screen.setAttribute("aria-hidden","false");
+    document.body.style.overflow="hidden";
+
+    try{
+      const {data,error}=await supabaseClient
+        .from("lessons")
+        .select("lesson_date,start_time,end_time,lesson_name,minutes,price,status,gym_code")
+        .gte("lesson_date",start)
+        .lte("lesson_date",end)
+        .eq("gym_code",gymCode)
+        .eq("status","done")
+        .order("lesson_date",{ascending:true})
+        .order("start_time",{ascending:true});
+
+      if(error) throw error;
+
+      const rows=data || [];
+      const totalN=rows.length;
+      const totalMin=rows.reduce((s,r)=>s+Number(r.minutes||0),0);
+      const totalEuro=rows.reduce((s,r)=>s+Number(r.price||0),0);
+      const h=Math.floor(totalMin/60);
+      const min=totalMin%60;
+      const prices=[...new Set(rows.map(r=>Number(r.price||0).toFixed(2)))];
+      const tariffa=prices.length===1 ? formatEuro(Number(prices[0])) : (rows.length ? "Variabile" : formatEuro(0));
+
+      let html=`
+        <div class="billingGymSummary">
+          <div class="billingGymStat"><small>Lezioni svolte</small><strong>${totalN}</strong></div>
+          <div class="billingGymStat"><small>Ore svolte</small><strong>${h}h ${min}m</strong></div>
+          <div class="billingGymStat"><small>Tariffa</small><strong>${tariffa}</strong></div>
+          <div class="billingGymStat"><small>Da fatturare</small><strong>${formatEuro(totalEuro)}</strong></div>
+        </div>
+        <div class="billingGymListTitle">Lezioni del mese</div>`;
+
+      if(!rows.length){
+        html += '<div class="billingGymEmpty">Nessuna lezione svolta per questa palestra nel mese selezionato.</div>';
+      }else{
+        rows.forEach(r=>{
+          const d=new Date(r.lesson_date+"T12:00:00");
+          const dateLabel=d.toLocaleDateString("it-IT",{weekday:"short",day:"2-digit",month:"2-digit"});
+          const startTime=String(r.start_time||"").slice(0,5);
+          const endTime=String(r.end_time||"").slice(0,5);
+          const timeLabel=endTime ? `${startTime}–${endTime}` : startTime;
+          html += `
+            <div class="billingLessonRow">
+              <div class="dateCol"><b>${dateLabel}</b></div>
+              <div class="timeCol">${timeLabel}</div>
+              <div class="nameCol">
+                <div class="lessonName">${r.lesson_name || "Lezione"}</div>
+                <div class="muted">Svolta</div>
+              </div>
+              <div class="minutesCol">${Number(r.minutes||0)} min</div>
+              <div class="amount">${formatEuro(r.price)}</div>
+            </div>`;
+        });
+      }
+
+      content.innerHTML=html;
+      screen.scrollTop=0;
+    }catch(err){
+      console.error("Errore dettaglio fatturazione palestra:",err);
+      content.innerHTML='<div class="billingGymEmpty">Impossibile caricare il dettaglio della palestra.</div>';
+    }
+  }
+
+  function closeBillingGym(){
+    const screen=document.getElementById("billingGymScreen");
+    if(!screen) return;
+    screen.classList.remove("open");
+    screen.setAttribute("aria-hidden","true");
+    document.body.style.overflow="";
+    window.scrollTo({top:billingReturnScrollY,behavior:"auto"});
+  }
+
   async function renderBillingSummary(){
     const target=document.getElementById("billingSummary");
     const title=document.getElementById("billingTitle");
@@ -1956,7 +2192,9 @@ totalEuro += v.euro;
         const tariffa = v.n > 0 ? (v.euro / v.n) : 0;
 
         html += `
-          <div class="billingCard">
+          <div class="billingCard clickable" role="button" tabindex="0"
+               onclick="openBillingGym('${g}')"
+               onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openBillingGym('${g}')}">
             <h4>${names[g]}</h4>
             <div class="billingMetric"><span>Lezioni svolte</span><strong>${v.n}</strong></div>
             <div class="billingMetric"><span>Ore svolte</span><strong>${h}h ${min}m</strong></div>
