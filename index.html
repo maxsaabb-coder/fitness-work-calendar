@@ -77,6 +77,11 @@ main{
   background:#eaf5f7;
   border-color:#7fb3bf
 }
+.quickNavBtn.billingQuickBtn{
+  font-size:15px;
+  font-weight:900;
+  letter-spacing:.1px
+}
 .quickNavBtn.future{
   cursor:default;
   color:#6f8f96;
@@ -183,10 +188,31 @@ main{
   max-width:900px;
   margin:auto;
   padding:14px 16px;
-  display:flex;
+  display:grid;
+  grid-template-columns:auto 1fr;
   align-items:center;
   gap:14px
 }
+.billingGymTitleNav{
+  display:grid;
+  grid-template-columns:42px 1fr 42px;
+  align-items:center;
+  gap:8px;
+  min-width:0
+}
+.billingGymMonthBtn{
+  width:42px;
+  height:38px;
+  border:1px solid #9cc6cf;
+  border-radius:9px;
+  background:#f3fafb;
+  color:#234e59;
+  font-size:24px;
+  line-height:1;
+  font-weight:900;
+  cursor:pointer
+}
+.billingGymMonthBtn:hover{background:#eaf5f7}
 .billingGymBack{
   border:1px solid #9cc6cf;
   border-left:5px solid #2f6f7e;
@@ -201,7 +227,24 @@ main{
 }
 .billingGymHeader h2{
   margin:0;
-  font-size:19px
+  font-size:19px;
+  text-align:center;
+  min-width:0
+}
+@media (max-width:600px){
+  .billingGymHeaderInner{
+    grid-template-columns:1fr;
+    gap:8px
+  }
+  .billingGymBack{
+    justify-self:start
+  }
+  .billingGymTitleNav{
+    width:100%
+  }
+  .billingGymHeader h2{
+    font-size:17px
+  }
 }
 .billingGymWrap{
   max-width:900px;
@@ -1028,7 +1071,7 @@ footer{
   <button class="quickNavBtn" onclick="scrollToQuickSection('weekSummaryTitle')">📅 Settimana</button>
   <button class="quickNavBtn" onclick="scrollToQuickSection('monthTitle')">🗓 Mese</button>
   <button class="quickNavBtn" onclick="scrollToQuickSection('profitabilityHub')">€ Redditività</button>
-  <button class="quickNavBtn" onclick="scrollToQuickSection('billingHub')">🧾 Fatturazione</button>
+  <button class="quickNavBtn billingQuickBtn" onclick="scrollToQuickSection('billingHub')">🧾 Fatturazione</button>
 </div>
 
 <div class="summary">
@@ -1161,7 +1204,11 @@ footer{
   <div class="billingGymHeader">
     <div class="billingGymHeaderInner">
       <button class="billingGymBack" onclick="closeBillingGym()">← Torna a Fatturazione</button>
-      <h2 id="billingGymTitle">Dettaglio palestra</h2>
+      <div class="billingGymTitleNav">
+        <button class="billingGymMonthBtn" onclick="changeBillingDetailMonth(-1)" aria-label="Mese precedente">‹</button>
+        <h2 id="billingGymTitle">Dettaglio palestra</h2>
+        <button class="billingGymMonthBtn" onclick="changeBillingDetailMonth(1)" aria-label="Mese successivo">›</button>
+      </div>
     </div>
   </div>
   <div class="billingGymWrap">
@@ -2054,18 +2101,27 @@ totalEuro += v.euro;
   }
 }
   let billingReturnScrollY = 0;
+  let billingDetailMonth = null;
+  let billingDetailGymCode = null;
+  let billingDetailMode = "gym";
 
-  async function openBillingGym(gymCode){
+  async function openBillingGym(gymCode, preserveMonth=false){
     const screen=document.getElementById("billingGymScreen");
     const title=document.getElementById("billingGymTitle");
     const content=document.getElementById("billingGymContent");
     if(!screen || !title || !content) return;
 
-    billingReturnScrollY=window.scrollY;
+    if(!preserveMonth){
+      billingReturnScrollY=window.scrollY;
+      billingDetailMonth=new Date(summaryMonth);
+    }
+    billingDetailGymCode=gymCode;
+    billingDetailMode="gym";
+
     const names={"AR":"A&R","MAX":"MAX","TN":"TN","STSM":"STSM"};
     const gymName=names[gymCode] || gymCode;
 
-    const monthDate=new Date(summaryMonth);
+    const monthDate=new Date(billingDetailMonth || summaryMonth);
     const y=monthDate.getFullYear();
     const m=monthDate.getMonth();
     const start=iso(new Date(y,m,1));
@@ -2140,15 +2196,20 @@ totalEuro += v.euro;
     }
   }
 
-  async function openBillingTotal(){
+  async function openBillingTotal(preserveMonth=false){
     const screen=document.getElementById("billingGymScreen");
     const title=document.getElementById("billingGymTitle");
     const content=document.getElementById("billingGymContent");
     if(!screen || !title || !content) return;
 
-    billingReturnScrollY=window.scrollY;
+    if(!preserveMonth){
+      billingReturnScrollY=window.scrollY;
+      billingDetailMonth=new Date(summaryMonth);
+    }
+    billingDetailGymCode=null;
+    billingDetailMode="total";
 
-    const monthDate=new Date(summaryMonth);
+    const monthDate=new Date(billingDetailMonth || summaryMonth);
     const y=monthDate.getFullYear();
     const m=monthDate.getMonth();
     const start=iso(new Date(y,m,1));
@@ -2233,9 +2294,30 @@ totalEuro += v.euro;
     }
   }
 
+  async function changeBillingDetailMonth(delta){
+    if(!billingDetailMonth) billingDetailMonth=new Date(summaryMonth);
+    billingDetailMonth.setMonth(billingDetailMonth.getMonth()+delta);
+
+    if(billingDetailMode==="total"){
+      await openBillingTotal(true);
+    }else if(billingDetailGymCode){
+      await openBillingGym(billingDetailGymCode,true);
+    }
+  }
+
   function closeBillingGym(){
     const screen=document.getElementById("billingGymScreen");
     if(!screen) return;
+
+    if(billingDetailMonth){
+      summaryMonth=new Date(billingDetailMonth);
+      renderMonthlySummary();
+      renderDailyProfitability();
+      renderGymProfitability();
+      renderEconomicCharts();
+      renderBillingSummary();
+    }
+
     screen.classList.remove("open");
     screen.setAttribute("aria-hidden","true");
     document.body.style.overflow="";
