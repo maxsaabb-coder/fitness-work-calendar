@@ -21,6 +21,63 @@ header{
 }
 header h1{margin:0;font-size:25px}
 header p{margin:5px 0 0;color:#d1d5db;font-size:14px}
+.headerInner{
+  max-width:850px;
+  margin:auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px
+}
+.headerTitle{min-width:0}
+.logoutBtn{
+  display:none;
+  border:1px solid #9cc6cf;
+  border-left:4px solid #2f6f7e;
+  border-right:4px solid #2f6f7e;
+  border-radius:9px;
+  background:#f3fafb;
+  color:#234e59;
+  padding:8px 11px;
+  font-size:12px;
+  font-weight:800;
+  cursor:pointer;
+  white-space:nowrap
+}
+.logoutBtn:hover{background:#eaf5f7}
+.loginSecondary{
+  width:100%;
+  margin-top:8px;
+  padding:10px 12px;
+  border:1px solid #9cc6cf;
+  border-radius:9px;
+  background:#f3fafb;
+  color:#234e59;
+  font-weight:800;
+  cursor:pointer
+}
+.loginSecondary:hover{background:#eaf5f7}
+#loginInfo{
+  margin:8px 0 0;
+  color:#166534;
+  font-size:13px;
+  line-height:1.35
+}
+#recoveryBox{
+  display:none;
+  max-width:420px;
+  margin:40px auto;
+  padding:20px;
+  background:white;
+  border-radius:16px;
+  box-shadow:0 4px 20px #0002
+}
+#recoveryBox input{
+  width:100%;
+  padding:12px;
+  margin:8px 0;
+  box-sizing:border-box
+}
 
 main{
   max-width:850px;
@@ -1100,12 +1157,28 @@ footer{
   <input id="loginEmail" type="email" placeholder="Email" style="width:100%;padding:12px;margin:8px 0;box-sizing:border-box;">
   <input id="loginPassword" type="password" placeholder="Password" style="width:100%;padding:12px;margin:8px 0;box-sizing:border-box;">
   <button onclick="login()" style="width:100%;padding:12px;margin-top:8px;">Accedi</button>
+  <button class="loginSecondary" onclick="requestPasswordReset()">Password dimenticata?</button>
   <p id="loginError" style="color:#c00;"></p>
+  <p id="loginInfo"></p>
+</div>
+
+<div id="recoveryBox">
+  <h2>Imposta nuova password</h2>
+  <p style="color:#6b7280;font-size:13px;line-height:1.4">Inserisci due volte la nuova password per l'account di Olga.</p>
+  <input id="newPassword1" type="password" placeholder="Nuova password">
+  <input id="newPassword2" type="password" placeholder="Ripeti nuova password">
+  <button onclick="saveRecoveredPassword()" style="width:100%;padding:12px;margin-top:8px;">Salva nuova password</button>
+  <p id="recoveryError" style="color:#c00;"></p>
 </div>
 
 <header>
-<h1>Calendario Olga</h1>
-<p>Lezioni · presenze · compensi</p>
+  <div class="headerInner">
+    <div class="headerTitle">
+      <h1>Calendario Olga</h1>
+      <p>Lezioni · presenze · compensi</p>
+    </div>
+    <button id="logoutBtn" class="logoutBtn" onclick="logout()">Esci</button>
+  </div>
 </header>
 
 <div class="topTools">
@@ -1750,6 +1823,76 @@ function renderDays(){
     syncAccessUI();
   }
 
+  async function requestPasswordReset(){
+    const emailInput=document.getElementById("loginEmail");
+    const errorBox=document.getElementById("loginError");
+    const infoBox=document.getElementById("loginInfo");
+    const email=(emailInput?.value || "").trim();
+
+    errorBox.textContent="";
+    infoBox.textContent="";
+
+    if(!email){
+      errorBox.textContent="Inserisci prima l'indirizzo email, poi premi Password dimenticata?.";
+      emailInput?.focus();
+      return;
+    }
+
+    const redirectTo=window.location.origin + window.location.pathname;
+    const {error}=await supabaseClient.auth.resetPasswordForEmail(email,{redirectTo});
+
+    if(error){
+      console.error("Errore reset password:",error);
+      errorBox.textContent="Non sono riuscito a inviare l'email di recupero. Controlla l'indirizzo e riprova.";
+      return;
+    }
+
+    infoBox.textContent="Email di recupero inviata. Apri il messaggio ricevuto e usa il link per impostare una nuova password.";
+  }
+
+  async function saveRecoveredPassword(){
+    const p1=document.getElementById("newPassword1").value;
+    const p2=document.getElementById("newPassword2").value;
+    const errorBox=document.getElementById("recoveryError");
+    errorBox.textContent="";
+
+    if(p1.length < 6){
+      errorBox.textContent="La password deve avere almeno 6 caratteri.";
+      return;
+    }
+    if(p1 !== p2){
+      errorBox.textContent="Le due password non coincidono.";
+      return;
+    }
+
+    const {error}=await supabaseClient.auth.updateUser({password:p1});
+    if(error){
+      console.error("Errore aggiornamento password:",error);
+      errorBox.textContent="Non sono riuscito a salvare la nuova password.";
+      return;
+    }
+
+    document.getElementById("recoveryBox").style.display="none";
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("logoutBtn").style.display="";
+    alert("Password aggiornata correttamente.");
+    await loadWeekFromSupabase();
+    await renderLessonHistory();
+    await loadCalendarExceptions();
+  }
+
+  async function logout(){
+    await supabaseClient.auth.signOut();
+    adminMode=false;
+    adminUntil=0;
+    isReadOnly=false;
+    document.getElementById("logoutBtn").style.display="none";
+    document.getElementById("loginBox").style.display="block";
+    document.getElementById("loginPassword").value="";
+    document.getElementById("loginInfo").textContent="";
+    window.scrollTo({top:0,behavior:"auto"});
+  }
+
   async function login() {
     const email = document.getElementById("loginEmail").value.trim();
     const password = document.getElementById("loginPassword").value;
@@ -1770,6 +1913,7 @@ function renderDays(){
     isReadOnly = data.user?.email === "maxsaabb@gmail.com";
     await refreshAdminStatus();
     document.getElementById("loginBox").style.display = "none";
+    document.getElementById("logoutBtn").style.display = "";
     await loadWeekFromSupabase();
     await renderLessonHistory();
     await loadCalendarExceptions();
@@ -1780,12 +1924,14 @@ function renderDays(){
 
     if (data.session) {
       document.getElementById("loginBox").style.display = "none";
+      document.getElementById("logoutBtn").style.display = "";
       isReadOnly = data.session.user?.email === "maxsaabb@gmail.com";
       await refreshAdminStatus();
       await renderLessonHistory();
       await loadCalendarExceptions();
     } else {
       document.getElementById("loginBox").style.display = "block";
+      document.getElementById("logoutBtn").style.display = "none";
       isReadOnly = false;
       adminMode = false;
       adminUntil = 0;
@@ -1795,13 +1941,24 @@ function renderDays(){
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     isReadOnly = session?.user?.email === "maxsaabb@gmail.com";
+
+    if(event === "PASSWORD_RECOVERY"){
+      document.getElementById("loginBox").style.display = "none";
+      document.getElementById("recoveryBox").style.display = "block";
+      document.getElementById("logoutBtn").style.display = "none";
+      window.scrollTo({top:0,behavior:"auto"});
+      return;
+    }
+
     if (!session) {
       adminMode = false;
       adminUntil = 0;
       syncAccessUI();
+      document.getElementById("logoutBtn").style.display = "none";
     } else {
       refreshAdminStatus();
       renderLessonHistory();
+      document.getElementById("logoutBtn").style.display = "";
     }
     document.getElementById("loginBox").style.display = session ? "none" : "block";
   });
