@@ -2176,6 +2176,16 @@ function renderDays(){
     if (badge) badge.style.display = active ? "block" : "none";
     if (allDoneBtn) allDoneBtn.style.display = (maxAccount && !active) ? "none" : "";
     if (kmCostEditBtn) kmCostEditBtn.style.display = (maxAccount && !active) ? "none" : "";
+
+    // Aggiorna subito il comando delle fatture quando si attiva/disattiva
+    // la modalità amministratore, senza richiedere un cambio di mese.
+    const historicalAddBtn = document.getElementById("histInvoiceAddBtn");
+    if (historicalAddBtn) {
+      historicalAddBtn.style.display =
+        ((!maxAccount || active) &&
+         document.getElementById("loginBox")?.style.display === "none") ? "" : "none";
+    }
+
     syncExceptionEditUI();
     if(document.getElementById("exceptionsScreen")?.classList.contains("show")) renderCalendarExceptions();
   }
