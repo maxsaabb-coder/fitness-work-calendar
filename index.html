@@ -553,6 +553,25 @@ main{
   }
 }
 
+/* Navigazione e report nel dettaglio fatturazione palestra */
+.billingGymListHead{position:relative;display:flex;align-items:center;justify-content:flex-start;gap:12px;flex-wrap:wrap;min-height:40px;margin:18px 0 10px}
+.billingGymListHead .billingReportBtn{position:absolute;left:50%;transform:translateX(-50%)}
+@media(max-width:700px){.billingGymListHead .billingReportBtn{position:static;transform:none;margin-left:auto}}
+.billingGymListHead .billingGymListTitle{margin:0}
+.billingReportBtn{border:2px solid #fdba74;border-left:5px solid #ea580c;border-right:5px solid #ea580c;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:13px;font-weight:800;padding:9px 13px;cursor:pointer}
+.billingReportBtn:hover{background:#ffedd5}
+.billingDetailFloatTop{display:none;position:fixed;right:16px;top:50%;transform:translateY(-50%);z-index:155;padding:10px 12px;border:2px solid #9cc6cf;border-left:5px solid #2f6f7e;border-right:5px solid #2f6f7e;border-radius:10px;background:#f3fafb;color:#234e59;box-shadow:0 3px 12px #0002;font-size:12px;font-weight:800;cursor:pointer}
+.billingDetailFloatTop.show{display:block}
+.billingReportOverlay{display:none;position:fixed;inset:0;background:#11182799;z-index:170;align-items:center;justify-content:center;padding:15px;box-sizing:border-box}
+.billingReportOverlay.open{display:flex}
+.billingReportPanel{width:min(680px,100%);max-height:88vh;overflow:auto;background:#fff;border-radius:15px;padding:20px;box-sizing:border-box;box-shadow:0 10px 50px #0004}
+.billingReportPanel h3{margin:0 0 8px}
+.billingReportPanel textarea{width:100%;min-height:290px;box-sizing:border-box;resize:vertical;font:13px/1.5 system-ui,sans-serif;padding:12px;border:1px solid #9ca3af;border-radius:10px;background:#f9fafb;color:#111827}
+.billingReportActions{display:flex;flex-wrap:wrap;gap:9px;margin:12px 0}
+.billingReportActions button{border:2px solid #fdba74;border-left:5px solid #ea580c;border-right:5px solid #ea580c;border-radius:9px;background:#fff7ed;color:#9a3412;padding:9px 12px;font-weight:800;cursor:pointer}
+.billingReportActions button:hover{background:#ffedd5}
+@media(max-width:600px){.billingDetailFloatTop{right:6px;padding:8px 7px;font-size:11px}.billingReportPanel{padding:13px}}
+
 /* Pulsante flottante nello Storico lezioni */
 .historyFloatTop{
   position:fixed;
@@ -1429,6 +1448,21 @@ footer{
   </div>
   <div class="billingGymWrap">
     <div id="billingGymContent"></div>
+  </div>
+  <button id="billingDetailFloatTop" class="billingDetailFloatTop" onclick="billingDetailScrollTop()">↑ Torna in alto</button>
+</div>
+
+<div id="billingReportOverlay" class="billingReportOverlay" role="dialog" aria-modal="true" aria-labelledby="billingReportTitle">
+  <div class="billingReportPanel">
+    <h3 id="billingReportTitle">Report per palestra</h3>
+    <p style="font-size:13px;color:#6b7280">Controlla il messaggio prima di inviarlo. Verrà aperta WhatsApp o la tua app email per scegliere il destinatario.</p>
+    <textarea id="billingReportText" aria-label="Testo del report"></textarea>
+    <div class="billingReportActions">
+      <button type="button" onclick="shareBillingReportWhatsApp()">WhatsApp</button>
+      <button type="button" onclick="shareBillingReportEmail()">Email</button>
+      <button type="button" onclick="copyBillingReport()">Copia testo</button>
+      <button type="button" onclick="closeBillingReport()">Chiudi</button>
+    </div>
   </div>
 </div>
 
@@ -2442,6 +2476,64 @@ totalEuro += v.euro;
   let billingDetailGymCode = null;
   let billingDetailMode = "gym";
 
+  let billingReportSubject="";
+  let billingReportMessage="";
+  function billingDetailScrollTop(){
+    document.getElementById("billingGymScreen")?.scrollTo({top:0,behavior:"smooth"});
+  }
+  function refreshBillingDetailFloat(){
+    const screen=document.getElementById("billingGymScreen");
+    const btn=document.getElementById("billingDetailFloatTop");
+    if(!screen || !btn) return;
+    btn.classList.toggle("show",screen.classList.contains("open") && screen.scrollTop>280);
+  }
+  document.getElementById("billingGymScreen")?.addEventListener("scroll",refreshBillingDetailFloat,{passive:true});
+  function buildBillingGymReport(gymName,monthName,doneRows,missedRows){
+    const doneMin=doneRows.reduce((a,r)=>a+Number(r.minutes||0),0);
+    const missingMin=missedRows.reduce((a,r)=>a+Number(r.minutes||0),0);
+    const revenue=doneRows.reduce((a,r)=>a+Number(r.price||0),0);
+    const fmtMin=n=>`${Math.floor(n/60)}h ${n%60}m`;
+    const labels={gym_cancelled:"Annullata palestra",olga_absent:"Assenza Olga",substituted:"Sostituita",holiday_closed:"Chiusura / Festività"};
+    const lines=[
+      `REPORT LEZIONI – ${gymName} – ${monthName}`,
+      "",
+      `Lezioni svolte: ${doneRows.length}`,
+      `Ore svolte: ${fmtMin(doneMin)}`,
+      `Totale da fatturare: ${formatEuro(revenue)}`,
+      "",
+      `Lezioni non svolte: ${missedRows.length}`,
+      `Ore non svolte: ${fmtMin(missingMin)}`,
+      "",
+      "DETTAGLIO LEZIONI NON SVOLTE"
+    ];
+    if(!missedRows.length) lines.push("Nessuna lezione non svolta.");
+    missedRows.forEach(r=>{
+      const d=new Date(r.lesson_date+"T12:00:00");
+      const date=d.toLocaleDateString("it-IT",{weekday:"short",day:"2-digit",month:"2-digit",year:"numeric"});
+      const start=String(r.start_time||"").slice(0,5);
+      const end=String(r.end_time||"").slice(0,5);
+      lines.push(`• ${date} | ${start}–${end} | ${r.lesson_name||"Lezione"} | ${Number(r.minutes||0)} min | ${labels[r.status]||"Non svolta"}`);
+    });
+    lines.push("","Riepilogo basato sugli stati registrati nel Calendario Olga.");
+    billingReportSubject=`Report ${gymName} – ${monthName}`;
+    billingReportMessage=lines.join("\n");
+  }
+  function openBillingReport(){
+    const overlay=document.getElementById("billingReportOverlay");
+    document.getElementById("billingReportTitle").textContent=billingReportSubject;
+    document.getElementById("billingReportText").value=billingReportMessage;
+    overlay.classList.add("open");
+  }
+  function closeBillingReport(){document.getElementById("billingReportOverlay")?.classList.remove("open");}
+  function reportText(){return document.getElementById("billingReportText")?.value||"";}
+  function shareBillingReportWhatsApp(){window.open("https://wa.me/?text="+encodeURIComponent(reportText()),"_blank","noopener");}
+  function shareBillingReportEmail(){window.location.href="mailto:?subject="+encodeURIComponent(billingReportSubject)+"&body="+encodeURIComponent(reportText());}
+  async function copyBillingReport(){
+    const area=document.getElementById("billingReportText");
+    try{await navigator.clipboard.writeText(reportText());alert("Report copiato.");}
+    catch(e){area.focus();area.select();alert("Testo selezionato: usa Copia per copiarlo.");}
+  }
+
   async function openBillingGym(gymCode, preserveMonth=false){
     const screen=document.getElementById("billingGymScreen");
     const title=document.getElementById("billingGymTitle");
@@ -2513,7 +2605,10 @@ totalEuro += v.euro;
           <div class="billingGymStat"><small>Tariffa</small><strong>${tariffa}</strong></div>
           <div class="billingGymStat"><small>Da fatturare</small><strong>${formatEuro(totalEuro)}</strong></div>
         </div>
-        <div class="billingGymListTitle">Lezioni svolte del mese</div>`;
+        <div class="billingGymListHead">
+          <div class="billingGymListTitle">Lezioni svolte del mese</div>
+          <button type="button" class="billingReportBtn" onclick="openBillingReport()">✉ Report per palestra</button>
+        </div>`;
 
       if(!rows.length){
         html += '<div class="billingGymEmpty">Nessuna lezione svolta per questa palestra nel mese selezionato.</div>';
@@ -2572,8 +2667,10 @@ totalEuro += v.euro;
         });
       }
 
+      buildBillingGymReport(gymName,monthName,rows,missedRows);
       content.innerHTML=html;
       screen.scrollTop=0;
+      refreshBillingDetailFloat();
     }catch(err){
       console.error("Errore dettaglio fatturazione palestra:",err);
       content.innerHTML='<div class="billingGymEmpty">Impossibile caricare il dettaglio della palestra.</div>';
@@ -2806,8 +2903,10 @@ totalEuro += v.euro;
       renderBillingSummary();
     }
 
+    closeBillingReport();
     screen.classList.remove("open");
     screen.setAttribute("aria-hidden","true");
+    refreshBillingDetailFloat();
     document.body.style.overflow="";
     window.scrollTo({top:billingReturnScrollY,behavior:"auto"});
   }
