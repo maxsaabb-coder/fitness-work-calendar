@@ -572,6 +572,23 @@ main{
 .billingReportActions button:hover{background:#ffedd5}
 @media(max-width:600px){.billingDetailFloatTop{right:6px;padding:8px 7px;font-size:11px}.billingReportPanel{padding:13px}}
 
+/* Archivio fatture storiche */
+.histControls{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}
+.histAction{border:2px solid #9cc6cf;border-left:5px solid #2f6f7e;border-right:5px solid #2f6f7e;border-radius:10px;background:#f3fafb;color:#234e59;padding:9px 13px;font-size:13px;font-weight:800;cursor:pointer}
+.histAction:hover{background:#eaf5f7}
+.histInvoiceList{display:grid;gap:8px;margin:10px 0 14px}
+.histInvoiceRow{border:1px solid #d1d5db;border-left:5px solid #64748b;border-radius:9px;background:#fff;padding:10px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+.histInvoiceRow small{display:block;color:#64748b;margin-top:4px}
+.histInvoiceActions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.histInvoiceActions button{border:1px solid #94a3b8;background:white;border-radius:8px;padding:6px 9px;cursor:pointer}
+.histInvoiceOverlay{position:fixed;inset:0;z-index:220;background:#0f172a99;display:none;align-items:center;justify-content:center;padding:15px}
+.histInvoiceOverlay.open{display:flex}
+.histInvoicePanel{width:min(460px,100%);max-height:90vh;overflow:auto;background:white;border-radius:14px;padding:20px;box-sizing:border-box}
+.histInvoicePanel label{display:block;font-size:13px;font-weight:700;margin:9px 0 4px}
+.histInvoicePanel input,.histInvoicePanel select,.histInvoicePanel textarea{width:100%;padding:9px;border:1px solid #94a3b8;border-radius:8px;box-sizing:border-box;font:inherit}
+.histInvoicePanel .histInvoiceButtons{display:flex;gap:8px;margin-top:14px}
+.histInvoicePanel .histInvoiceButtons button{flex:1}
+.histInvoicePanel .histError{color:#b91c1c;font-size:12px}
 /* Pulsante flottante nello Storico lezioni */
 .historyFloatTop{
   position:fixed;
@@ -1405,6 +1422,12 @@ footer{
     Riepilogo delle sole <b>lezioni svolte</b>, raggruppate per palestra. Gli importi qui indicati sono quelli da usare come riferimento per la fattura mensile.
   </div>
   <div id="billingSummary"></div>
+  <div class="histControls">
+    <strong>Archivio fatture già emesse</strong>
+    <button class="histAction" id="histInvoiceAddBtn" onclick="openHistoricalInvoiceEditor()" style="display:none">＋ Inserisci fattura storica</button>
+  </div>
+  <div id="historicalInvoiceList" class="histInvoiceList"></div>
+
   <div class="backTopWrap"><button class="backTopBtn" onclick="goPageTop()">↑ Torna in alto</button></div>
 </div>
 
@@ -1434,6 +1457,31 @@ footer{
 </div>
 
 </main>
+
+<div id="histInvoiceOverlay" class="histInvoiceOverlay" aria-hidden="true">
+  <div class="histInvoicePanel" role="dialog" aria-modal="true" aria-label="Fattura storica">
+    <h3 id="histInvoiceModalTitle">Inserisci fattura storica</h3>
+    <p style="font-size:12px;color:#64748b">Registra l'importo reale della fattura, senza inventare ore o lezioni. Il numero fattura è facoltativo.</p>
+    <input type="hidden" id="histInvoiceId">
+    <label for="histInvoiceGym">Palestra</label>
+    <select id="histInvoiceGym"><option value="AR">A&R</option><option value="MAX">MAX</option><option value="TN">TN</option><option value="STSM">STSM</option></select>
+    <label for="histInvoiceMonth">Mese di competenza</label>
+    <input type="month" id="histInvoiceMonth" onchange="updateHistoricalGymOptions()">
+    <label for="histInvoiceAmount">Importo fattura (€)</label>
+    <input type="number" id="histInvoiceAmount" step="0.01" min="0" inputmode="decimal" placeholder="Es. 620,00">
+    <label for="histInvoiceNumber">Numero fattura (facoltativo)</label>
+    <input id="histInvoiceNumber" maxlength="120" placeholder="Es. 17/2025">
+    <label for="histInvoiceDate">Data emissione (facoltativa)</label>
+    <input type="date" id="histInvoiceDate">
+    <label for="histInvoiceNote">Note (facoltative)</label>
+    <textarea id="histInvoiceNote" rows="2"></textarea>
+    <p id="histInvoiceError" class="histError"></p>
+    <div class="histInvoiceButtons">
+      <button class="histAction" onclick="closeHistoricalInvoiceEditor()">Annulla</button>
+      <button class="histAction" id="histInvoiceSaveBtn" onclick="saveHistoricalInvoice()">Salva fattura</button>
+    </div>
+  </div>
+</div>
 
 <div id="billingGymScreen" class="billingGymScreen" aria-hidden="true">
   <div class="billingGymHeader">
@@ -2875,6 +2923,18 @@ totalEuro += v.euro;
           <strong>${formatEuro(totalEuro)}</strong>
         </div>`;
 
+      try{
+        const invoices=await loadHistoricalInvoices(start,end);
+        const historicalByMonth=Array.from({length:12},()=>[]);
+        invoices.forEach(r=>historicalByMonth[Number(r.reference_month.slice(5,7))-1].push(r));
+        if(invoices.length){
+          const historicalSum=sumHistoricalInvoices(invoices);
+          html+=`<h3 style="margin-top:25px">Fatture storiche effettivamente emesse</h3><p style="font-size:12px;color:#64748b">Valori registrati manualmente. Sono separati dai totali calcolati dalle lezioni per evitare doppi conteggi.</p>`;
+          const monthsIt=["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"];
+          historicalByMonth.forEach((arr,i)=>{if(arr.length)html+=`<div class="histInvoiceRow"><b>${monthsIt[i]}</b><strong>${formatEuro(sumHistoricalInvoices(arr))}</strong></div>`});
+          html+=`<div class="billingTotal"><div><b>Totale fatture storiche ${year}</b><small>${invoices.length} fatture registrate</small></div><strong>${formatEuro(historicalSum)}</strong></div>`;
+        }
+      }catch(e){console.error("Archivio storico annuale:",e);html+='<p>Storico fatture non disponibile.</p>'}
       content.innerHTML=html;
       screen.scrollTop=0;
     }catch(err){
@@ -2909,6 +2969,100 @@ totalEuro += v.euro;
     refreshBillingDetailFloat();
     document.body.style.overflow="";
     window.scrollTo({top:billingReturnScrollY,behavior:"auto"});
+  }
+
+  const HIST_GYM_NAMES={AR:"A&R",MAX:"MAX",TN:"TN",STSM:"STSM"};
+  function canEditHistoricalInvoices(){
+    // Coerente con le policy RLS: Olga può scrivere, Max solo leggere.
+    return !isReadOnly && document.getElementById("loginBox")?.style.display==="none";
+  }
+  async function loadHistoricalInvoices(start,end){
+    const q=supabaseClient.from("historical_invoices")
+      .select("id,gym_code,reference_month,amount,invoice_number,invoice_date,note")
+      .gte("reference_month",start).lte("reference_month",end)
+      .order("reference_month",{ascending:true});
+    const {data,error}=await q;
+    if(error) throw error;
+    return data||[];
+  }
+  function updateHistoricalGymOptions(){
+    const month=document.getElementById("histInvoiceMonth")?.value||"";
+    const gym=document.getElementById("histInvoiceGym");
+    if(!gym)return;
+    const stsm=gym.querySelector('option[value="STSM"]');
+    if(stsm)stsm.disabled=Boolean(month && month<"2026-09");
+    if(stsm?.disabled && gym.value==="STSM")gym.value="AR";
+  }
+  function invoiceMonthKey(row){return row.reference_month.slice(0,7)+"|"+row.gym_code;}
+  function groupedInvoicesByGym(rows){
+    const result={};
+    rows.forEach(r=>{(result[r.gym_code]??=[]).push(r)});
+    return result;
+  }
+  function sumHistoricalInvoices(rows){return rows.reduce((a,r)=>a+Number(r.amount||0),0)}
+  function historicalInvoiceRowHtml(r){
+    const n=r.invoice_number?" · N. "+escapeHtml(r.invoice_number):"";
+    const d=r.invoice_date?" · Emessa "+formatDateIt(r.invoice_date):"";
+    const buttons=canEditHistoricalInvoices()?`<div class="histInvoiceActions"><button onclick="event.stopPropagation();editHistoricalInvoice('${r.id}')">Modifica</button><button onclick="event.stopPropagation();deleteHistoricalInvoice('${r.id}')">Elimina</button></div>`:"";
+    return `<div class="histInvoiceRow"><div><strong>${HIST_GYM_NAMES[r.gym_code]||r.gym_code}: ${formatEuro(r.amount)}</strong><small>Fattura storica${n}${d}</small></div>${buttons}</div>`;
+  }
+  let visibleHistoricalInvoices=[];
+  function openHistoricalInvoiceEditor(row=null){
+    if(!canEditHistoricalInvoices()){alert("Solo Olga può inserire o modificare fatture storiche.");return}
+    const selected=new Date(summaryMonth);
+    document.getElementById("histInvoiceId").value=row?.id||"";
+    document.getElementById("histInvoiceGym").value=row?.gym_code||"AR";
+    document.getElementById("histInvoiceMonth").value=row?.reference_month?.slice(0,7)||`${selected.getFullYear()}-${String(selected.getMonth()+1).padStart(2,"0")}`;
+    updateHistoricalGymOptions();
+    document.getElementById("histInvoiceAmount").value=row?.amount??"";
+    document.getElementById("histInvoiceNumber").value=row?.invoice_number||"";
+    document.getElementById("histInvoiceDate").value=row?.invoice_date||"";
+    document.getElementById("histInvoiceNote").value=row?.note||"";
+    document.getElementById("histInvoiceModalTitle").textContent=row?"Modifica fattura storica":"Inserisci fattura storica";
+    document.getElementById("histInvoiceError").textContent="";
+    const modal=document.getElementById("histInvoiceOverlay");modal.classList.add("open");modal.setAttribute("aria-hidden","false");
+  }
+  function closeHistoricalInvoiceEditor(){
+    const modal=document.getElementById("histInvoiceOverlay");modal.classList.remove("open");modal.setAttribute("aria-hidden","true");
+  }
+  function editHistoricalInvoice(id){
+    const row=visibleHistoricalInvoices.find(r=>r.id===id);
+    if(row)openHistoricalInvoiceEditor(row);
+  }
+  async function saveHistoricalInvoice(){
+    if(!canEditHistoricalInvoices())return;
+    const errorEl=document.getElementById("histInvoiceError");errorEl.textContent="";
+    const id=document.getElementById("histInvoiceId").value;
+    const month=document.getElementById("histInvoiceMonth").value;
+    const raw=document.getElementById("histInvoiceAmount").value.trim().replace(",",".");
+    const amount=Number(raw);
+    if(!/^\d{4}-\d{2}$/.test(month)||raw===""||!Number.isFinite(amount)||amount<0){errorEl.textContent="Inserisci mese e importo validi.";return}
+    const selectedGym=document.getElementById("histInvoiceGym").value;
+    if(selectedGym==="STSM" && month<"2026-09"){
+      errorEl.textContent="STSM è presente soltanto da settembre 2026. Seleziona un mese successivo.";
+      return;
+    }
+    const row={gym_code:selectedGym,reference_month:month+"-01",amount,
+      invoice_number:document.getElementById("histInvoiceNumber").value.trim()||null,
+      invoice_date:document.getElementById("histInvoiceDate").value||null,
+      note:document.getElementById("histInvoiceNote").value.trim()||null};
+    const btn=document.getElementById("histInvoiceSaveBtn");btn.disabled=true;
+    try{
+      const result=id?await supabaseClient.from("historical_invoices").update(row).eq("id",id):await supabaseClient.from("historical_invoices").insert(row);
+      if(result.error)throw result.error;
+      closeHistoricalInvoiceEditor();
+      summaryMonth=new Date(Number(month.slice(0,4)),Number(month.slice(5,7))-1,1);
+      await renderBillingSummary();
+    }catch(e){console.error(e);errorEl.textContent="Salvataggio non riuscito. Controlla che la tabella sia stata creata in Supabase e che tu sia collegata come Olga."}
+    finally{btn.disabled=false}
+  }
+  async function deleteHistoricalInvoice(id){
+    if(!canEditHistoricalInvoices())return;
+    const row=visibleHistoricalInvoices.find(r=>r.id===id);
+    if(!row||!confirm("Eliminare questa fattura storica? L'operazione non è reversibile."))return;
+    const {error}=await supabaseClient.from("historical_invoices").delete().eq("id",id);
+    if(error){alert("Eliminazione non riuscita.");console.error(error);return}
+    await renderBillingSummary();
   }
 
   async function renderBillingSummary(){
@@ -3012,6 +3166,17 @@ totalEuro += v.euro;
           <strong>Apri ›</strong>
         </div>`;
 
+      const invArea=document.getElementById("historicalInvoiceList");
+      const addButton=document.getElementById("histInvoiceAddBtn");
+      if(addButton)addButton.style.display=canEditHistoricalInvoices()?"":"none";
+      try{
+        visibleHistoricalInvoices=await loadHistoricalInvoices(start,end);
+        const byGym=groupedInvoicesByGym(visibleHistoricalInvoices);
+        const billedAmount=sumHistoricalInvoices(visibleHistoricalInvoices);
+        invArea.innerHTML=visibleHistoricalInvoices.length
+          ? `<div style="font-size:12px;color:#64748b">Fatture realmente emesse in questo mese (archivio separato dai conteggi delle lezioni):</div>${["AR","MAX","TN","STSM"].flatMap(g=>(byGym[g]||[]).map(historicalInvoiceRowHtml)).join("")}<div class="billingTotal"><div><b>Totale fatture storiche registrate</b><small>Non sommato al totale calcolato dalle lezioni</small></div><strong>${formatEuro(billedAmount)}</strong></div>`
+          : '<div style="font-size:12px;color:#64748b">Nessuna fattura storica registrata per il mese selezionato.</div>';
+      }catch(e){console.error(e);invArea.textContent="Archivio storico non disponibile: eseguire prima lo script SQL in Supabase."}
       target.innerHTML=html;
     }catch(err){
       console.error("Errore fatturazione mensile:",err);
