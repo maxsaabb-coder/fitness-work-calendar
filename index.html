@@ -46,6 +46,19 @@ header p{margin:5px 0 0;color:#d1d5db;font-size:14px}
 }
 .logoutBtn:hover{background:#fee2e2}
 .logoutBtn.show{display:inline-flex;align-items:center;gap:6px}
+.headerAccount{
+  display:none;
+  align-items:center;
+  gap:10px;
+  margin-left:auto
+}
+.headerAccount.show{display:flex}
+.currentUserLabel{
+  font-size:13px;
+  font-weight:800;
+  color:#e5e7eb;
+  white-space:nowrap
+}
 @media (max-width:600px){
   .headerInner{
     align-items:flex-start
@@ -1187,7 +1200,10 @@ footer{
       <h1>Calendario Olga</h1>
       <p>Lezioni · presenze · compensi</p>
     </div>
-    <button id="logoutBtn" class="logoutBtn" onclick="logout()">↪ Esci / Cambia account</button>
+    <div id="headerAccount" class="headerAccount">
+      <span id="currentUserLabel" class="currentUserLabel"></span>
+      <button id="logoutBtn" class="logoutBtn" onclick="logout()">↪ Esci / Cambia account</button>
+    </div>
   </div>
 </header>
 
@@ -1833,6 +1849,20 @@ function renderDays(){
     syncAccessUI();
   }
 
+  function setCurrentUserLabel(email){
+    const group=document.getElementById("headerAccount");
+    const label=document.getElementById("currentUserLabel");
+    const normalized=String(email || "").toLowerCase();
+
+    let name="";
+    if(normalized==="maxsaabb@gmail.com") name="Max";
+    else if(normalized==="olgaplaksinait@gmail.com") name="Olga";
+    else if(normalized) name=email;
+
+    if(label) label.textContent = name ? "Accesso: " + name : "";
+    if(group) group.classList.toggle("show", !!name);
+  }
+
   async function requestPasswordReset(){
     const emailInput=document.getElementById("loginEmail");
     const errorBox=document.getElementById("loginError");
@@ -1923,6 +1953,7 @@ function renderDays(){
     }
 
     isReadOnly = data.user?.email === "maxsaabb@gmail.com";
+    setCurrentUserLabel(data.user?.email);
     await refreshAdminStatus();
     document.getElementById("loginBox").style.display = "none";
     document.getElementById("recoveryBox").style.display = "none";
@@ -1938,6 +1969,7 @@ function renderDays(){
     if (data.session) {
       document.getElementById("loginBox").style.display = "none";
       document.getElementById("logoutBtn").classList.add("show");
+      setCurrentUserLabel(data.session.user?.email);
       isReadOnly = data.session.user?.email === "maxsaabb@gmail.com";
       await refreshAdminStatus();
       await renderLessonHistory();
@@ -1945,6 +1977,7 @@ function renderDays(){
     } else {
       document.getElementById("loginBox").style.display = "block";
       document.getElementById("logoutBtn").classList.remove("show");
+    setCurrentUserLabel("");
       isReadOnly = false;
       adminMode = false;
       adminUntil = 0;
@@ -1954,11 +1987,13 @@ function renderDays(){
 
   supabaseClient.auth.onAuthStateChange((event, session) => {
     isReadOnly = session?.user?.email === "maxsaabb@gmail.com";
+    setCurrentUserLabel(session?.user?.email);
 
     if(event === "PASSWORD_RECOVERY"){
       document.getElementById("loginBox").style.display = "none";
       document.getElementById("recoveryBox").style.display = "block";
       document.getElementById("logoutBtn").classList.remove("show");
+    setCurrentUserLabel("");
       window.scrollTo({top:0,behavior:"auto"});
       return;
     }
@@ -1968,6 +2003,7 @@ function renderDays(){
       adminUntil = 0;
       syncAccessUI();
       document.getElementById("logoutBtn").classList.remove("show");
+    setCurrentUserLabel("");
     } else {
       refreshAdminStatus();
       renderLessonHistory();
