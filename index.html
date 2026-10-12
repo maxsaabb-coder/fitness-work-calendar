@@ -2973,8 +2973,8 @@ totalEuro += v.euro;
 
   const HIST_GYM_NAMES={AR:"A&R",MAX:"MAX",TN:"TN",STSM:"STSM"};
   function canEditHistoricalInvoices(){
-    // Coerente con le policy RLS: Olga può scrivere, Max solo leggere.
-    return !isReadOnly && document.getElementById("loginBox")?.style.display==="none";
+    // Olga può scrivere; Max può scrivere soltanto con modalità amministratore attiva.
+    return (!isReadOnly || (adminMode && Date.now() < adminUntil)) && document.getElementById("loginBox")?.style.display==="none";
   }
   async function loadHistoricalInvoices(start,end){
     const q=supabaseClient.from("historical_invoices")
@@ -3008,7 +3008,7 @@ totalEuro += v.euro;
   }
   let visibleHistoricalInvoices=[];
   function openHistoricalInvoiceEditor(row=null){
-    if(!canEditHistoricalInvoices()){alert("Solo Olga può inserire o modificare fatture storiche.");return}
+    if(!canEditHistoricalInvoices()){alert("Per modificare le fatture storiche accedi come Olga oppure attiva la modalità amministratore di Max.");return}
     const selected=new Date(summaryMonth);
     document.getElementById("histInvoiceId").value=row?.id||"";
     document.getElementById("histInvoiceGym").value=row?.gym_code||"AR";
@@ -3053,7 +3053,7 @@ totalEuro += v.euro;
       closeHistoricalInvoiceEditor();
       summaryMonth=new Date(Number(month.slice(0,4)),Number(month.slice(5,7))-1,1);
       await renderBillingSummary();
-    }catch(e){console.error(e);errorEl.textContent="Salvataggio non riuscito. Controlla che la tabella sia stata creata in Supabase e che tu sia collegata come Olga."}
+    }catch(e){console.error(e);errorEl.textContent="Salvataggio non riuscito. Verifica i permessi Supabase e che la modalità amministratore sia attiva."}
     finally{btn.disabled=false}
   }
   async function deleteHistoricalInvoice(id){
