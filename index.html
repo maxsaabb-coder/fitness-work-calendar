@@ -333,8 +333,8 @@ main{
 }
 .billingGymSummary{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:10px;
+  grid-template-columns:repeat(5,1fr);
+  gap:8px;
   margin-bottom:16px
 }
 .billingGymStat{
@@ -342,16 +342,29 @@ main{
   border-left:5px solid #2f6f7e;
   border-radius:12px;
   background:#f8fcfd;
-  padding:11px 12px
+  padding:9px 10px
+}
+.billingGymStat.missed{
+  border-color:#fecaca;
+  border-left-color:#dc2626;
+  background:#fff7f7
 }
 .billingGymStat small{
   display:block;
   color:#6b7280;
   font-weight:700;
-  margin-bottom:4px
+  margin-bottom:3px;
+  font-size:11px
 }
 .billingGymStat strong{
-  font-size:20px
+  font-size:17px
+}
+.billingGymStat .subvalue{
+  display:block;
+  margin-top:2px;
+  color:#9a3412;
+  font-size:11px;
+  font-weight:700
 }
 .billingGymListTitle{
   margin:18px 0 10px;
@@ -372,6 +385,16 @@ main{
 .billingLessonRow .lessonName{font-weight:800}
 .billingLessonRow .muted{font-size:12px;color:#6b7280}
 .billingLessonRow .amount{text-align:right;font-weight:800}
+.billingLessonRow.missed{
+  border-left-color:#dc2626;
+  background:#fffafa
+}
+.billingLessonRow.missed .lessonName{color:#991b1b}
+.billingMissedTitle{
+  margin:24px 0 10px;
+  font-size:17px;
+  color:#991b1b
+}
 .billingGymEmpty{
   padding:18px;
   border:1px dashed #9ca3af;
@@ -2448,29 +2471,42 @@ totalEuro += v.euro;
         .gte("lesson_date",start)
         .lte("lesson_date",end)
         .eq("gym_code",gymCode)
-        .eq("status","done")
         .order("lesson_date",{ascending:true})
         .order("start_time",{ascending:true});
 
       if(error) throw error;
 
-      const rows=data || [];
+      const allRows=data || [];
+      const rows=allRows.filter(r=>r.status==="done");
+      const missedRows=allRows.filter(r=>r.status && r.status!=="done" && r.status!=="pending");
+
       const totalN=rows.length;
       const totalMin=rows.reduce((s,r)=>s+Number(r.minutes||0),0);
       const totalEuro=rows.reduce((s,r)=>s+Number(r.price||0),0);
+      const missedN=missedRows.length;
+      const missedMin=missedRows.reduce((s,r)=>s+Number(r.minutes||0),0);
+
       const h=Math.floor(totalMin/60);
       const min=totalMin%60;
+      const missedH=Math.floor(missedMin/60);
+      const missedM=missedMin%60;
+
       const prices=[...new Set(rows.map(r=>Number(r.price||0).toFixed(2)))];
       const tariffa=prices.length===1 ? formatEuro(Number(prices[0])) : (rows.length ? "Variabile" : formatEuro(0));
 
       let html=`
         <div class="billingGymSummary">
           <div class="billingGymStat"><small>Lezioni svolte</small><strong>${totalN}</strong></div>
+          <div class="billingGymStat missed">
+            <small>Non svolte</small>
+            <strong>${missedN}</strong>
+            <span class="subvalue">${missedH}h ${missedM}m</span>
+          </div>
           <div class="billingGymStat"><small>Ore svolte</small><strong>${h}h ${min}m</strong></div>
           <div class="billingGymStat"><small>Tariffa</small><strong>${tariffa}</strong></div>
           <div class="billingGymStat"><small>Da fatturare</small><strong>${formatEuro(totalEuro)}</strong></div>
         </div>
-        <div class="billingGymListTitle">Lezioni del mese</div>`;
+        <div class="billingGymListTitle">Lezioni svolte del mese</div>`;
 
       if(!rows.length){
         html += '<div class="billingGymEmpty">Nessuna lezione svolta per questa palestra nel mese selezionato.</div>';
@@ -2491,6 +2527,40 @@ totalEuro += v.euro;
               </div>
               <div class="minutesCol">${Number(r.minutes||0)} min</div>
               <div class="amount">${formatEuro(r.price)}</div>
+            </div>`;
+        });
+      }
+
+      const missedLabels={
+        gym_cancelled:"Annullata palestra",
+        olga_absent:"Assenza Olga",
+        substituted:"Sostituita",
+        holiday_closed:"Chiusura / Festività"
+      };
+
+      html += '<div class="billingMissedTitle">Lezioni non svolte</div>';
+
+      if(!missedRows.length){
+        html += '<div class="billingGymEmpty">Nessuna lezione non svolta nel mese selezionato.</div>';
+      }else{
+        missedRows.forEach(r=>{
+          const d=new Date(r.lesson_date+"T12:00:00");
+          const dateLabel=d.toLocaleDateString("it-IT",{weekday:"short",day:"2-digit",month:"2-digit"});
+          const startTime=String(r.start_time||"").slice(0,5);
+          const endTime=String(r.end_time||"").slice(0,5);
+          const timeLabel=endTime ? `${startTime}–${endTime}` : startTime;
+          const reason=missedLabels[r.status] || "Non svolta";
+
+          html += `
+            <div class="billingLessonRow missed">
+              <div class="dateCol"><b>${dateLabel}</b></div>
+              <div class="timeCol">${timeLabel}</div>
+              <div class="nameCol">
+                <div class="lessonName">${r.lesson_name || "Lezione"}</div>
+                <div class="muted">${reason}</div>
+              </div>
+              <div class="minutesCol">${Number(r.minutes||0)} min</div>
+              <div class="amount">€0,00</div>
             </div>`;
         });
       }
@@ -2535,7 +2605,6 @@ totalEuro += v.euro;
         .select("lesson_date,gym_code,minutes,price,status")
         .gte("lesson_date",start)
         .lte("lesson_date",end)
-        .eq("status","done")
         .order("lesson_date",{ascending:true});
 
       if(error) throw error;
@@ -2761,18 +2830,24 @@ totalEuro += v.euro;
       const names={"AR":"A&R","MAX":"MAX","TN":"TN","STSM":"STSM"};
       const order=["AR","MAX","TN","STSM"];
       const gyms={
-        "AR":{n:0,min:0,euro:0},
-        "MAX":{n:0,min:0,euro:0},
-        "TN":{n:0,min:0,euro:0},
-        "STSM":{n:0,min:0,euro:0}
+        "AR":{n:0,min:0,euro:0,missed:0,missedMin:0},
+        "MAX":{n:0,min:0,euro:0,missed:0,missedMin:0},
+        "TN":{n:0,min:0,euro:0,missed:0,missedMin:0},
+        "STSM":{n:0,min:0,euro:0,missed:0,missedMin:0}
       };
 
       (data || []).forEach(r=>{
         const g=r.gym_code || "ALTRO";
-        if(!gyms[g]) gyms[g]={n:0,min:0,euro:0};
-        gyms[g].n += 1;
-        gyms[g].min += Number(r.minutes || 0);
-        gyms[g].euro += Number(r.price || 0);
+        if(!gyms[g]) gyms[g]={n:0,min:0,euro:0,missed:0,missedMin:0};
+
+        if(r.status==="done"){
+          gyms[g].n += 1;
+          gyms[g].min += Number(r.minutes || 0);
+          gyms[g].euro += Number(r.price || 0);
+        }else if(r.status && r.status!=="pending"){
+          gyms[g].missed += 1;
+          gyms[g].missedMin += Number(r.minutes || 0);
+        }
       });
 
       const monthName=monthDate.toLocaleDateString("it-IT",{month:"long",year:"numeric"});
@@ -2797,6 +2872,7 @@ totalEuro += v.euro;
                onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openBillingGym('${g}')}">
             <h4>${names[g]}</h4>
             <div class="billingMetric"><span>Lezioni svolte</span><strong>${v.n}</strong></div>
+            <div class="billingMetric"><span>Lezioni non svolte</span><strong>${v.missed}</strong></div>
             <div class="billingMetric"><span>Ore svolte</span><strong>${h}h ${min}m</strong></div>
             <div class="billingMetric"><span>Calcolo</span><strong>${v.n} × ${formatEuro(tariffa)}</strong></div>
             <div class="billingAmount">
