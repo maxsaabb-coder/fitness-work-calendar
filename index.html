@@ -776,6 +776,7 @@ main{
 .dayDot.event.gym_closed{background:#dc2626}
 .dayDot.event.olga_vacation{background:#f59e0b}
 .dayDot.missed{background:#ef4444}
+.dayDot.reminder{background:#b45309}
 
 .daytitle{
   font-size:20px;
@@ -1948,10 +1949,17 @@ function renderDays(){
      eventType==="gym_closed" ? "Chiusura palestra" :
      "Festività / evento";
 
-   const dots=(hasEvent || hasMissed)
+   // Promemoria giornaliero: almeno una lezione terminata da 30 minuti,
+   // ma ancora in stato "Da confermare".
+   const hasReminder=schedule
+     .filter(r=>r[0]===i)
+     .some(r=>lessonNeedsReminder(r,getData(keyFor(r))));
+
+   const dots=(hasEvent || hasMissed || hasReminder)
      ? `<span class="dayDots">
           ${hasEvent?`<span class="dayDot event ${eventType}" title="${eventTitle}"></span>`:""}
           ${hasMissed?'<span class="dayDot missed" title="Lezione non svolta"></span>':""}
+          ${hasReminder?'<span class="dayDot reminder" title="Lezioni da verificare, concluse da almeno 30 minuti"></span>':""}
         </span>`
      : "";
 
